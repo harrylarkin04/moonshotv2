@@ -4,7 +4,7 @@ from core.evo_factory import evolve_new_alpha
 
 st.set_page_config(page_title="MOONSHOT", layout="wide", page_icon="🌑", initial_sidebar_state="collapsed")
 
-# GLOBAL CYBERPUNK CSS (already included above - add it here if not already)
+# PASTE THE GLOBAL CYBERPUNK CSS HERE (the big block above)
 
 st.markdown('<p class="big-title" style="text-align:center">🌑 MOONSHOT</p>', unsafe_allow_html=True)
 st.markdown('<h2 style="text-align:center; color:#00ff9f; letter-spacing:6px;">THE AUTONOMOUS CAUSAL QUANT SINGULARITY</h2>', unsafe_allow_html=True)
