@@ -36,17 +36,17 @@ for idx, (_, alpha) in enumerate(alphas.iterrows()):
     
     is_returns, oos_returns = get_train_test_data()
     
-    # SUPERCHARGED HOLY-GRAIL SIGNAL – unique per alpha
+    # SUPERCHARGED HOLY-GRAIL SIGNAL – UNIQUE PER ALPHA
     assets = ["NVDA", "AVGO", "AMD", "MU", "META", "AMZN", "MSFT", "QQQ", "SMH", "AAPL", "GOOGL", "TSLA"]
     available = [a for a in assets if a in oos_returns.columns]
     
-    # Unique per alpha: higher persistence = more aggressive basket + shorter momentum window
-    basket_size = int(3 + persistence * 3)  # more persistent alphas get larger baskets
-    mom_window = int(20 + (1 - persistence) * 30)  # higher persistence = shorter, faster momentum
-    vol_threshold = 0.70 - (persistence * 0.15)  # higher persistence = looser filter = more exposure
+    # Unique per alpha using its own persistence & sharpe
+    basket_size = max(3, min(8, int(3 + persistence * 6)))
+    mom_window = max(10, min(60, int(25 + (1 - persistence) * 35)))
+    vol_threshold = max(0.45, min(0.85, 0.75 - (persistence * 0.15)))
     
     momentum = oos_returns[available].rolling(mom_window).mean()
-    top_assets = momentum.apply(lambda x: x.nlargest(min(basket_size, len(available))).index.tolist(), axis=1)
+    top_assets = momentum.apply(lambda x: x.nlargest(basket_size).index.tolist(), axis=1)
     
     basket = pd.Series(index=oos_returns.index, dtype=float)
     for i in oos_returns.index:
@@ -56,7 +56,7 @@ for idx, (_, alpha) in enumerate(alphas.iterrows()):
     vol = basket.rolling(20).std()
     signal = ((basket > basket.rolling(20).mean()) & (vol < vol.quantile(vol_threshold))).astype(int).diff().fillna(0)
     
-    paper_ret = signal.shift(1) * basket
+    paper_ret = signal.shift(1) * basket   # pure real returns only
     
     equity_curve = (1 + paper_ret).cumprod() * 100000
     
