@@ -40,4 +40,4 @@ st.dataframe(get_top_alphas(20), use_container_width=True, hide_index=True)
 if st.button("🔄 Refresh (new alphas appear live)"):
     st.rerun()
 
-st.success("Worker running in background → new regime-robust alphas born every ~45s. This is the real groundbreaking product.")
+st.success("Worker running in background → new regime-robust alphas born every ~45s.")
