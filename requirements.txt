@@ -7,5 +7,6 @@ networkx
 yfinance
 statsmodels
 deap
+scipy
 openai
 python-dotenv
