@@ -2,9 +2,6 @@ import streamlit as st
 from core.registry import get_top_alphas
 from core.evo_factory import evolve_new_alpha
 
-st.set_page_config(page_title="MOONSHOT", layout="wide", page_icon="🌑", initial_sidebar_state="collapsed")
-
-
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto+Mono:wght@300;400;700&display=swap');
@@ -17,7 +14,7 @@ body {
 
 .big-title {
     font-family: 'Orbitron', sans-serif;
-    font-size: 5.2rem;
+    font-size: 4.8rem;
     font-weight: 900;
     background: linear-gradient(90deg, #00ff9f, #00b8ff, #ff00ff);
     -webkit-background-clip: text;
@@ -36,6 +33,7 @@ body {
     backdrop-filter: blur(30px);
     border: 2px solid #00ff9f;
     border-radius: 28px;
+    padding: 30px;
     box-shadow: 0 0 80px rgba(0,255,159,0.6), inset 0 0 40px rgba(0,255,159,0.2);
     transition: transform 0.4s ease, box-shadow 0.4s ease;
 }
@@ -80,6 +78,9 @@ body {
 }
 </style>
 """, unsafe_allow_html=True)
+
+st.set_page_config(page_title="MOONSHOT", layout="wide", page_icon="🌑", initial_sidebar_state="collapsed")
+
 
 st.markdown('<p class="big-title" style="text-align:center">🌑 MOONSHOT</p>', unsafe_allow_html=True)
 st.markdown('<h2 style="text-align:center; color:#00ff9f; letter-spacing:6px;">THE AUTONOMOUS CAUSAL QUANT SINGULARITY</h2>', unsafe_allow_html=True)
