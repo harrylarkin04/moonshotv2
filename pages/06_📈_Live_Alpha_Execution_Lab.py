@@ -7,17 +7,9 @@ from core.data_fetcher import get_train_test_data
 
 st.set_page_config(page_title="Live Execution Lab", layout="wide", page_icon="📈")
 
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto+Mono:wght@300;400;700&display=swap');
-body {background: radial-gradient(circle at 50% 10%, #1a0033 0%, #05050f 70%); font-family: 'Roboto Mono', monospace;}
-.big-title {font-family: 'Orbitron', sans-serif; font-size: 4.8rem; font-weight: 900; background: linear-gradient(90deg, #00ff9f, #00b8ff, #ff00ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-shadow: 0 0 80px #00ff9f; animation: neonpulse 2s ease-in-out infinite alternate;}
-@keyframes neonpulse {from {text-shadow: 0 0 20px #00ff9f;} to {text-shadow: 0 0 100px #00ff9f, 0 0 140px #ff00ff;}}
-.glass-box {background: rgba(15,15,45,0.95); backdrop-filter: blur(30px); border: 2px solid #00ff9f; border-radius: 28px; padding: 45px; box-shadow: 0 0 120px rgba(0,255,159,0.6);}
-</style>
-""", unsafe_allow_html=True)
+# PASTE THE GLOBAL CYBERPUNK CSS HERE (the big block from above)
 
-st.markdown('<p class="big-title" style="text-align:center">🌐 LIVE ALPHA EXECUTION LAB</p>', unsafe_allow_html=True)
+st.markdown('<p class="big-title" style="text-align:center">📈 LIVE ALPHA EXECUTION LAB</p>', unsafe_allow_html=True)
 st.markdown('<h3 style="text-align:center; color:#00ff9f">Strict Out-of-Sample Paper Trading – Top 10 Highest-Conviction Alphas</h3>', unsafe_allow_html=True)
 
 if st.button("🔴 UPDATE WITH LATEST MARKET DATA (OOS VALIDATION)", type="primary", use_container_width=True):
@@ -102,7 +94,7 @@ if combined_oos_returns is not None:
 
 st.success("**Strict Out-of-Sample only** – performance calculated exclusively on unseen recent data. No data snooping. New alphas are continuously discovered on In-Sample history and validated live on Out-of-Sample.")
 
-# Full Moonshot Integrated System Assumptions (added as requested)
+# FULL MOONSHOT INTEGRATED SYSTEM – DEFENSIBLE ASSUMPTIONS
 st.markdown("---")
 st.subheader("FULL MOONSHOT INTEGRATED SYSTEM – DEFENSIBLE PROJECTION")
 
