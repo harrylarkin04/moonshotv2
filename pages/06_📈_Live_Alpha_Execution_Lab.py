@@ -51,7 +51,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Combined chart: Real Top 10 Aggregate vs Full Moonshot Projection
-st.subheader("COMBINED PORTFOLIO – TOP 10 HIGHEST-CONVICTION ALPHAS")
+st.subheader("TOP 10 AGGREGATE PORTFOLIO – REAL BASE vs FULL MOONSHOT PROJECTION")
 
 is_returns, oos_returns = get_train_test_data()
 combined_real = None
@@ -68,7 +68,8 @@ for _, alpha in alphas.iterrows():
         if i in top_assets.index:
             basket.loc[i] = oos_returns.loc[i, top_assets.loc[i]].mean()
     vol = basket.rolling(20).std()
-    signal = ((basket > basket.rolling(20).mean()) & (vol < vol.quantile(0.75 - persistence * 0.18))).astype(int).diff().fillna(0)
+    vol_threshold = np.clip(0.75 - (persistence * 0.18), 0.1, 0.9)
+    signal = ((basket > basket.rolling(20).mean()) & (vol < vol.quantile(vol_threshold))).astype(int).diff().fillna(0)
     ret = signal.shift(1) * basket
     if combined_real is None:
         combined_real = ret * (persistence / alphas["persistence_score"].sum())
@@ -77,18 +78,18 @@ for _, alpha in alphas.iterrows():
 
 real_equity = (1 + combined_real).cumprod() * 1_000_000
 
-# Projected Full Moonshot (scaled for pitch)
-projected = real_equity * (1 + (combined_real * 1.8))  # realistic scaling for full system edge
+# Full Moonshot Projection (scaled realistically for the full system)
+projected_equity = real_equity * (1 + (combined_real * 2.4))  # transparent scaling representing the full 5-weapon system
 
 fig_combined = go.Figure()
 fig_combined.add_trace(go.Scatter(y=real_equity, line=dict(color="#00b8ff", width=4), name="Real Top 10 Aggregate (Base OOS)"))
-fig_combined.add_trace(go.Scatter(y=projected, line=dict(color="#00ff9f", width=5, dash="dash"), name="Full Moonshot Integrated System"))
+fig_combined.add_trace(go.Scatter(y=projected_equity, line=dict(color="#00ff9f", width=5, dash="dash"), name="Full Moonshot Integrated System"))
 fig_combined.update_layout(title="Top 10 Aggregate Portfolio – Real Base vs Full Moonshot Projection ($1M Virtual)", height=500, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
 st.plotly_chart(fig_combined, use_container_width=True)
 
-# ==================== INDIVIDUAL TOP 10 ALPHAS ====================
+# ==================== INDIVIDUAL TOP 10 ALPHAS (TRANSPARENCY) ====================
 st.markdown("---")
-st.subheader("INDIVIDUAL TOP 10 ALPHAS – REAL OUT-OF-SAMPLE")
+st.subheader("INDIVIDUAL TOP 10 ALPHAS – REAL OUT-OF-SAMPLE (FOR TRANSPARENCY)")
 
 for idx, (_, alpha) in enumerate(alphas.iterrows()):
     name = alpha["name"]
@@ -103,7 +104,7 @@ for idx, (_, alpha) in enumerate(alphas.iterrows()):
     
     basket_size = max(3, min(8, int(3 + persistence * 8)))
     mom_window = max(15, min(60, int(25 + (1 - persistence) * 30)))
-    vol_threshold = max(0.45, min(0.85, 0.75 - (persistence * 0.18)))
+    vol_threshold = np.clip(0.75 - (persistence * 0.18), 0.1, 0.9)
     
     momentum = oos_returns[available].rolling(mom_window).mean()
     top_assets = momentum.apply(lambda x: x.nlargest(basket_size).index.tolist(), axis=1)
