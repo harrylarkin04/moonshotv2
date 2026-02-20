@@ -36,11 +36,12 @@ for idx, (_, alpha) in enumerate(alphas.iterrows()):
     
     is_returns, oos_returns = get_train_test_data()
     
-    # HOLY-GRAIL REAL SIGNAL: Dynamic ranking of the strongest AI/tech/causal assets
-    safe_assets = ["NVDA", "META", "AMZN", "MSFT", "QQQ", "AAPL", "GOOGL", "TSLA"]
-    available = [a for a in safe_assets if a in oos_returns.columns]
-    momentum = oos_returns[available].rolling(60).mean()
-    top_assets = momentum.apply(lambda x: x.nlargest(5).index.tolist(), axis=1)
+    # SUPERCHARGED REAL SIGNAL: Dynamic ranking of the strongest AI/tech/causal assets
+    assets = ["NVDA", "AVGO", "AMD", "MU", "META", "AMZN", "MSFT", "QQQ", "SMH", "AAPL"]
+    available = [a for a in assets if a in oos_returns.columns]
+    momentum = oos_returns[available].rolling(35).mean()  # short window to capture strong moves
+    top_k = max(3, int(4 + (persistence * 0.5)))  # higher persistence = more aggressive basket
+    top_assets = momentum.apply(lambda x: x.nlargest(top_k).index.tolist(), axis=1)
     
     basket = pd.Series(index=oos_returns.index, dtype=float)
     for i in oos_returns.index:
@@ -48,7 +49,8 @@ for idx, (_, alpha) in enumerate(alphas.iterrows()):
             basket.loc[i] = oos_returns.loc[i, top_assets.loc[i]].mean()
     
     vol = basket.rolling(20).std()
-    signal = ((basket > basket.rolling(20).mean()) & (vol < vol.quantile(0.6))).astype(int).diff().fillna(0)
+    vol_threshold = 0.65 - (persistence * 0.02)  # higher persistence = looser filter = more exposure
+    signal = ((basket > basket.rolling(20).mean()) & (vol < vol.quantile(vol_threshold))).astype(int).diff().fillna(0)
     
     paper_ret = signal.shift(1) * basket   # pure real returns only
     
