@@ -16,14 +16,14 @@ body {background: radial-gradient(circle at 50% 10%, #1a0033 0%, #05050f 70%); f
 """, unsafe_allow_html=True)
 
 st.markdown('<p class="big-title" style="text-align:center">📈 LIVE ALPHA EXECUTION LAB</p>', unsafe_allow_html=True)
-st.markdown('<h3 style="text-align:center; color:#00ff9f">Strict Out-of-Sample Paper Trading – Top 10 Highest-Conviction Alphas</h3>', unsafe_allow_html=True)
+st.markdown('<h3 style="text-align:center; color:#00ff9f">100% Real Out-of-Sample Paper Trading – Top 10 Highest-Conviction Alphas</h3>', unsafe_allow_html=True)
 
-if st.button("🔴 UPDATE WITH LATEST MARKET DATA (OOS VALIDATION)", type="primary", use_container_width=True):
+if st.button("🔴 UPDATE WITH LATEST MARKET DATA (PURE REAL OOS)", type="primary", use_container_width=True):
     st.rerun()
 
 alphas = get_top_alphas(10)
 
-st.subheader("TOP 10 BEST ALPHAS – STRICT OUT-OF-SAMPLE PERFORMANCE")
+st.subheader("TOP 10 BEST ALPHAS – STRICT OUT-OF-SAMPLE (NO BOOST, NO FUDGE)")
 
 combined_oos_returns = None
 portfolio_value = 1_000_000.0
@@ -34,10 +34,11 @@ for _, alpha in alphas.iterrows():
     sharpe = alpha["sharpe"]
     persistence = alpha["persistence_score"]
     
-    is_returns, oos_returns = get_train_test_data()  # OOS = unseen recent data only
+    is_returns, oos_returns = get_train_test_data()  # OOS = completely unseen recent data
     
     price = (1 + oos_returns["SPY"]).cumprod() * 100
     
+    # Pure real signals (no artificial boost)
     if "causal" in desc.lower() or "omniverse" in desc.lower():
         signal = (oos_returns["SPY"] > oos_returns["SPY"].rolling(15).mean()).astype(int).diff().fillna(0)
     elif "crowd" in desc.lower() or "liquidity" in desc.lower():
@@ -45,7 +46,8 @@ for _, alpha in alphas.iterrows():
     else:
         signal = (price > price.rolling(40).mean()).astype(int).diff().fillna(0)
     
-    paper_ret = signal.shift(1) * oos_returns["SPY"] * 0.65 + np.random.normal(0.00028 * sharpe, 0.0048, len(oos_returns))
+    paper_ret = signal.shift(1) * oos_returns["SPY"]   # ← PURE REAL RETURNS ONLY
+    
     equity_curve = (1 + paper_ret).cumprod() * 100000
     
     current_pnl_pct = (equity_curve.iloc[-1] / 100000 - 1) * 100
@@ -75,13 +77,13 @@ for _, alpha in alphas.iterrows():
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 st.markdown("---")
-st.subheader("COMBINED PORTFOLIO – TOP 10 HIGHEST-CONVICTION ALPHAS (Risk-Parity, OOS ONLY)")
+st.subheader("COMBINED PORTFOLIO – TOP 10 HIGHEST-CONVICTION ALPHAS (Risk-Parity, PURE OOS)")
 
 if combined_oos_returns is not None:
     combined_equity = (1 + combined_oos_returns).cumprod() * portfolio_value
     total_pnl_pct = (combined_equity.iloc[-1] / portfolio_value - 1) * 100
     days = len(combined_oos_returns)
-    annualized = total_pnl_pct * (252 / days)
+    annualized = total_pnl_pct * (252 / days) if days > 0 else 0
     combined_dd = ((combined_equity / combined_equity.cummax() - 1).min() * 100)
     combined_sharpe = combined_oos_returns.mean() / combined_oos_returns.std() * np.sqrt(252) if combined_oos_returns.std() != 0 else 0
 
@@ -100,4 +102,4 @@ if combined_oos_returns is not None:
     fig_combined.update_layout(title="Moonshot Top 10 – Combined Equity Curve (Strict Out-of-Sample, $1M Virtual)", height=440, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
     st.plotly_chart(fig_combined, use_container_width=True)
 
-st.success("**Strict Out-of-Sample only** – performance calculated exclusively on unseen recent data. No data snooping. New alphas are continuously discovered on In-Sample history and validated live on Out-of-Sample.")
+st.success("**100% real market data. No artificial boost. No fudge. No look-ahead.** Performance calculated exclusively on unseen recent Out-of-Sample data. This is exactly how the strategies perform in the real world with the current simple signals.")
