@@ -17,7 +17,7 @@ creator.create("FitnessMax", base.Fitness, weights=(1.0,))
 creator.create("Individual", list, fitness=creator.FitnessMax)
 
 toolbox = base.Toolbox()
-toolbox.register("attr_int", random.randint, 5, 180)
+toolbox.register("attr_int", random.randint, 5, 200)
 toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_int, n=7)
 toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
@@ -40,8 +40,8 @@ toolbox.register("mutate", tools.mutShuffleIndexes, indpb=0.5)
 toolbox.register("select", tools.selTournament, tournsize=8)
 
 def evolve_new_alpha():
-    pop = toolbox.population(n=180)
-    algorithms.eaSimple(pop, toolbox, cxpb=0.8, mutpb=0.5, ngen=35, verbose=False)
+    pop = toolbox.population(n=200)
+    algorithms.eaSimple(pop, toolbox, cxpb=0.8, mutpb=0.5, ngen=40, verbose=False)
     best = tools.selBest(pop, 1)[0]
     sharpe = best.fitness.values[0]
     template = random.choice(STRATEGY_TEMPLATES)
