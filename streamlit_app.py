@@ -37,6 +37,7 @@ modules = [
     ("🌌 Financial Omniverse", "pages/03_🌌_Financial_Omniverse.py"),
     ("🧬 EvoAlpha Factory", "pages/04_🧬_EvoAlpha_Factory.py"),
     ("⚡ Liquidity Teleporter", "pages/05_⚡_Liquidity_Teleporter.py")
+    ("📈 Live Execution Lab", "pages/06_📈_Live_Alpha_Execution_Lab.py")
 ]
 for col, (name, page) in zip(cols, modules):
     with col:
