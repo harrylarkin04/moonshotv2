@@ -1,0 +1,11 @@
+streamlit
+pandas
+numpy
+plotly
+pyvis
+networkx
+yfinance
+statsmodels
+deap
+openai
+python-dotenv
