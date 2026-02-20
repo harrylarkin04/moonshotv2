@@ -28,17 +28,16 @@ st.subheader("TOP 10 BEST ALPHAS – STRICT OUT-OF-SAMPLE (NO BOOST, NO FUDGE)")
 combined_oos_returns = None
 portfolio_value = 1_000_000.0
 
-for _, alpha in alphas.iterrows():
+for idx, (_, alpha) in enumerate(alphas.iterrows()):
     name = alpha["name"]
     desc = alpha["description"]
     sharpe = alpha["sharpe"]
     persistence = alpha["persistence_score"]
     
-    is_returns, oos_returns = get_train_test_data()  # OOS = completely unseen recent data
+    is_returns, oos_returns = get_train_test_data()
     
     price = (1 + oos_returns["SPY"]).cumprod() * 100
     
-    # Pure real signals (no artificial boost)
     if "causal" in desc.lower() or "omniverse" in desc.lower():
         signal = (oos_returns["SPY"] > oos_returns["SPY"].rolling(15).mean()).astype(int).diff().fillna(0)
     elif "crowd" in desc.lower() or "liquidity" in desc.lower():
@@ -74,7 +73,7 @@ for _, alpha in alphas.iterrows():
     fig = go.Figure()
     fig.add_trace(go.Scatter(y=equity_curve, line=dict(color="#00ff9f", width=3.5)))
     fig.update_layout(height=200, margin=dict(l=0,r=0,t=10,b=0), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
-    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False}, key=f"equity_curve_{name}_{idx}")
 
 st.markdown("---")
 st.subheader("COMBINED PORTFOLIO – TOP 10 HIGHEST-CONVICTION ALPHAS (Risk-Parity, PURE OOS)")
@@ -100,6 +99,6 @@ if combined_oos_returns is not None:
     fig_combined = go.Figure()
     fig_combined.add_trace(go.Scatter(y=combined_equity, line=dict(color="#00ff9f", width=4.5)))
     fig_combined.update_layout(title="Moonshot Top 10 – Combined Equity Curve (Strict Out-of-Sample, $1M Virtual)", height=440, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
-    st.plotly_chart(fig_combined, use_container_width=True)
+    st.plotly_chart(fig_combined, use_container_width=True, key="combined_equity_curve")
 
-st.success("**100% real market data. No artificial boost. No fudge. No look-ahead.** Performance calculated exclusively on unseen recent Out-of-Sample data. This is exactly how the strategies perform in the real world with the current simple signals.")
+st.success("**100% real market data. No artificial boost. No fudge. No look-ahead.** Performance calculated exclusively on unseen recent Out-of-Sample data. This is exactly how the strategies perform in the real world with the current signals.")
