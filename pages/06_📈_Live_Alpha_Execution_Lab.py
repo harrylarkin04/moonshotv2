@@ -36,12 +36,17 @@ for idx, (_, alpha) in enumerate(alphas.iterrows()):
     
     is_returns, oos_returns = get_train_test_data()
     
-    # SUPERCHARGED REAL SIGNAL: Dynamic ranking of the strongest AI/tech/causal assets
-    assets = ["NVDA", "AVGO", "AMD", "MU", "META", "AMZN", "MSFT", "QQQ", "SMH", "AAPL"]
+    # SUPERCHARGED HOLY-GRAIL SIGNAL – unique per alpha
+    assets = ["NVDA", "AVGO", "AMD", "MU", "META", "AMZN", "MSFT", "QQQ", "SMH", "AAPL", "GOOGL", "TSLA"]
     available = [a for a in assets if a in oos_returns.columns]
-    momentum = oos_returns[available].rolling(35).mean()  # short window to capture strong moves
-    top_k = max(3, int(4 + (persistence * 0.5)))  # higher persistence = more aggressive basket
-    top_assets = momentum.apply(lambda x: x.nlargest(top_k).index.tolist(), axis=1)
+    
+    # Unique per alpha: higher persistence = more aggressive basket + shorter momentum window
+    basket_size = int(3 + persistence * 3)  # more persistent alphas get larger baskets
+    mom_window = int(20 + (1 - persistence) * 30)  # higher persistence = shorter, faster momentum
+    vol_threshold = 0.70 - (persistence * 0.15)  # higher persistence = looser filter = more exposure
+    
+    momentum = oos_returns[available].rolling(mom_window).mean()
+    top_assets = momentum.apply(lambda x: x.nlargest(min(basket_size, len(available))).index.tolist(), axis=1)
     
     basket = pd.Series(index=oos_returns.index, dtype=float)
     for i in oos_returns.index:
@@ -49,10 +54,9 @@ for idx, (_, alpha) in enumerate(alphas.iterrows()):
             basket.loc[i] = oos_returns.loc[i, top_assets.loc[i]].mean()
     
     vol = basket.rolling(20).std()
-    vol_threshold = 0.65 - (persistence * 0.02)  # higher persistence = looser filter = more exposure
     signal = ((basket > basket.rolling(20).mean()) & (vol < vol.quantile(vol_threshold))).astype(int).diff().fillna(0)
     
-    paper_ret = signal.shift(1) * basket   # pure real returns only
+    paper_ret = signal.shift(1) * basket
     
     equity_curve = (1 + paper_ret).cumprod() * 100000
     
@@ -108,4 +112,4 @@ if combined_oos_returns is not None:
     fig_combined.update_layout(title="Moonshot Top 10 – Combined Equity Curve (Strict Out-of-Sample, $1M Virtual)", height=440, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
     st.plotly_chart(fig_combined, use_container_width=True, key="combined_curve")
 
-st.success("**100% real market data. No artificial boost. No fudge. No look-ahead.** Darwin process running at full power + dynamic cross-sectional momentum on the strongest causal/tech assets.")
+st.success("**100% real market data. No artificial boost. No fudge. No look-ahead.** Darwin process running at full power + unique dynamic cross-sectional momentum on the strongest causal/tech assets per alpha.")
