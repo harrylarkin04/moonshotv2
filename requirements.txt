@@ -10,3 +10,4 @@ deap
 scipy
 openai
 python-dotenv
+groq
