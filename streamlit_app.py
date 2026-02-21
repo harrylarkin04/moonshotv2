@@ -31,41 +31,18 @@ body {
     to { text-shadow: 0 0 60px #00ff9f, 0 0 100px #00b8ff, 0 0 140px #ff00ff; }
 }
 
-.login-box {
+.glass-box {
     background: rgba(15,15,45,0.92);
     backdrop-filter: blur(30px);
     border: 2px solid #00ff9f;
     border-radius: 28px;
-    padding: 60px;
+    padding: 45px;
     box-shadow: 0 0 120px rgba(0,255,159,0.7);
-    max-width: 520px;
-    margin: 100px auto;
-}
-
-.stTextInput > div > div > input {
-    background: rgba(0,0,0,0.7) !important;
-    border: 1px solid #00ff9f !important;
-    color: #fff;
-}
-
-.stButton button {
-    background: transparent;
-    border: 2px solid #00ff9f;
-    color: #fff;
-    box-shadow: 0 0 25px #00ff9f;
-    transition: all 0.4s ease;
-    font-weight: 700;
-}
-
-.stButton button:hover {
-    background: rgba(0,255,159,0.15);
-    box-shadow: 0 0 60px #00ff9f, 0 0 100px #00b8ff;
-    transform: scale(1.05);
 }
 </style>
 """, unsafe_allow_html=True)
 
-# ==================== SECURE LOGIN SYSTEM ====================
+# ==================== SECURE LOGIN (protects everything) ====================
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
@@ -74,28 +51,26 @@ if not st.session_state.logged_in:
     st.markdown('<h2 style="text-align:center; color:#00ff9f;">ACCESS CONTROLLED</h2>', unsafe_allow_html=True)
 
     with st.container():
-        st.markdown('<div class="login-box">', unsafe_allow_html=True)
-        
-        username = st.text_input("Username", placeholder="harry / andy / daniel", autocomplete="off")
-        password = st.text_input("Password", type="password", placeholder="Enter password", autocomplete="off")
+        col1, col2, col3 = st.columns([1,2,1])
+        with col2:
+            st.markdown('<div class="glass-box">', unsafe_allow_html=True)
+            username = st.text_input("Username", placeholder="harry / andy / daniel", autocomplete="off")
+            password = st.text_input("Password", type="password", placeholder="Enter password", autocomplete="off")
 
-        if st.button("LOGIN", type="primary", use_container_width=True):
-            users = {
-                "harry": "moonshot2026",
-                "andy": "andy2026",
-                "daniel": "daniel2026"
-            }
-            
-            if username.lower() in users and password == users[username.lower()]:
-                st.session_state.logged_in = True
-                st.rerun()
-            else:
-                st.error("Invalid username or password")
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-
+            if st.button("LOGIN", type="primary", use_container_width=True):
+                users = {
+                    "harry": "moonshot2026",
+                    "andy": "andy2026",
+                    "daniel": "daniel2026"
+                }
+                if username.lower() in users and password == users[username.lower()]:
+                    st.session_state.logged_in = True
+                    st.rerun()
+                else:
+                    st.error("Invalid username or password")
+            st.markdown('</div>', unsafe_allow_html=True)
 else:
-    # ==================== MAIN APP (Logged In) ====================
+    # ==================== MAIN APP ====================
     st.markdown('<p class="big-title" style="text-align:center">🌑 MOONSHOT</p>', unsafe_allow_html=True)
 
     col1, col2, col3, col4 = st.columns(4)
