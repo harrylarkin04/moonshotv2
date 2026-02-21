@@ -1,31 +1,29 @@
 import os
 import streamlit as st
-from groq import Groq
 import networkx as nx
 from pyvis.network import Network
 import streamlit.components.v1 as components
 import numpy as np
 
-# Lazy Groq client - only created when first needed (prevents import crash)
+# Lazy Groq client - never crashes on import
 _groq_client = None
 
 def get_groq_client():
     global _groq_client
     if _groq_client is None:
         key = st.secrets.get("GROQ_API_KEY") or os.getenv("GROQ_API_KEY")
-        if not key:
-            return None
-        _groq_client = Groq(api_key=key)
+        if key:
+            from groq import Groq
+            _groq_client = Groq(api_key=key)
     return _groq_client
 
 def swarm_generate_hypotheses(returns):
     client = get_groq_client()
     assets = list(returns.columns)
-    
+
     prompt = f"""You are a swarm of 5 elite quant agents.
 Generate 5 distinct, novel multi-factor causal hypotheses for trading alphas using these assets: {assets}.
-Each hypothesis must suggest specific factors (satellite activity, dark-pool flow, web traffic surge, volatility skew, gamma cluster, order-flow signature, credit-card proxy, shipping data, etc.) and how they causally drive returns.
-Make them concrete and testable.
+Each hypothesis must suggest specific factors (satellite activity, dark-pool flow, web traffic, volatility skew, gamma cluster, order-flow, credit-card proxy, etc.) and how they causally drive returns.
 Output only one hypothesis per line, starting with "Agent X: "."""
 
     if client:
@@ -41,8 +39,8 @@ Output only one hypothesis per line, starting with "Agent X: "."""
         except:
             pass
 
-    # Fallback when no key or error
-    st.info("Using fallback hypotheses (Groq key not detected or rate limited)")
+    # Fallback - always works
+    st.info("Groq not available — using fallback hypotheses")
     return [
         f"Agent 1: Satellite activity + low volatility regime in {np.random.choice(assets)} causally drives strong returns",
         f"Agent 2: Dark-pool flow anomalies + gamma skew predicts regime shift in {np.random.choice(assets)}",
@@ -51,7 +49,7 @@ Output only one hypothesis per line, starting with "Agent X: "."""
         f"Agent 5: Volatility skew cluster + shipping data causally drives {np.random.choice(assets)}"
     ]
 
-# Keep your other functions (copy them from your previous version)
+# Existing functions (unchanged)
 def build_causal_dag(returns):
     G = nx.DiGraph()
     for col in returns.columns:
