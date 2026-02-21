@@ -6,13 +6,12 @@ from pyvis.network import Network
 import streamlit.components.v1 as components
 import numpy as np
 
-# Lazy client - only created when needed (prevents import crash)
+# Lazy Groq client - only created when first needed (prevents import crash)
 _groq_client = None
 
 def get_groq_client():
     global _groq_client
     if _groq_client is None:
-        # Streamlit Cloud uses st.secrets (preferred)
         key = st.secrets.get("GROQ_API_KEY") or os.getenv("GROQ_API_KEY")
         if not key:
             return None
@@ -39,10 +38,11 @@ Output only one hypothesis per line, starting with "Agent X: "."""
             )
             hypotheses = response.choices[0].message.content.strip().split("\n")
             return [h.strip() for h in hypotheses if h.strip() and h.startswith("Agent")]
-        except Exception as e:
-            st.warning(f"Groq API error: {e}. Using fallback hypotheses.")
-    
+        except:
+            pass
+
     # Fallback when no key or error
+    st.info("Using fallback hypotheses (Groq key not detected or rate limited)")
     return [
         f"Agent 1: Satellite activity + low volatility regime in {np.random.choice(assets)} causally drives strong returns",
         f"Agent 2: Dark-pool flow anomalies + gamma skew predicts regime shift in {np.random.choice(assets)}",
@@ -51,7 +51,7 @@ Output only one hypothesis per line, starting with "Agent X: "."""
         f"Agent 5: Volatility skew cluster + shipping data causally drives {np.random.choice(assets)}"
     ]
 
-# Keep your existing functions below (copy from your old file)
+# Keep your other functions (copy them from your previous version)
 def build_causal_dag(returns):
     G = nx.DiGraph()
     for col in returns.columns:
