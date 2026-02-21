@@ -3,6 +3,9 @@ from core.data_fetcher import get_multi_asset_data
 from core.causal_engine import swarm_generate_hypotheses, build_causal_dag, visualize_dag, counterfactual_sim
 import plotly.graph_objects as go
 
+if 'logged_in' not in st.session_state or not st.session_state.logged_in:
+    st.switch_page("streamlit_app.py")
+    
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto+Mono:wght@300;400;700&display=swap');
