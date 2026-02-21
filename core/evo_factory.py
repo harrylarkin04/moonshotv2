@@ -1,3 +1,4 @@
+import streamlit as st
 from deap import base, creator, tools, algorithms
 import random
 import numpy as np
@@ -15,9 +16,8 @@ toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
 def evaluate(individual):
     is_returns, _ = get_train_test_data()
-    # Use the hypothesis generated at the start of the cycle
-    hypothesis = st.session_state.get("current_hypothesis", "Fallback hypothesis")
-    # Simple multi-factor signal based on hypothesis + evolved parameters
+    # Get hypothesis from session state (safe)
+    hypothesis = st.session_state.get("current_hypothesis", "Fallback multi-factor hypothesis")
     price = (1 + is_returns["SPY"]).cumprod()
     p1, p2, p3, p4, p5, p6 = [int(x) for x in individual]
     signal = (price.rolling(p1).mean() > price.rolling(p2).mean()).astype(int).diff().fillna(0)
@@ -31,10 +31,10 @@ toolbox.register("mutate", tools.mutShuffleIndexes, indpb=0.5)
 toolbox.register("select", tools.selTournament, tournsize=8)
 
 def evolve_new_alpha():
-    # Generate LLM hypotheses ONLY ONCE per evolution cycle
+    # Generate LLM hypotheses only once per button press
     is_returns, _ = get_train_test_data()
     hypotheses = swarm_generate_hypotheses(is_returns)
-    st.session_state.current_hypothesis = hypotheses[0]  # Use first hypothesis for this generation
+    st.session_state.current_hypothesis = hypotheses[0] if hypotheses else "Fallback hypothesis"
 
     pop = toolbox.population(n=180)
     algorithms.eaSimple(pop, toolbox, cxpb=0.8, mutpb=0.5, ngen=40, verbose=False)
@@ -43,7 +43,7 @@ def evolve_new_alpha():
     sharpe = best.fitness.values[0]
     
     name = f"EvoAlpha_{random.randint(10000,99999)}"
-    desc = f"{st.session_state.current_hypothesis} – evolved through full Moonshot toolchain (CausalForge + Omniverse + ShadowCrowd + Liquidity Teleporter)"
+    desc = f"{st.session_state.current_hypothesis} – evolved through full Moonshot toolchain"
     persistence = round(sharpe * 0.88, 2)
     
     save_alpha(name, desc, round(sharpe, 2), persistence)
