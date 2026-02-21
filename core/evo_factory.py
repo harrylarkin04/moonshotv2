@@ -14,37 +14,50 @@ toolbox.register("attr_int", random.randint, 5, 200)
 toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_int, n=6)
 toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
-def evaluate(individual):
+def evaluate(individual, hypothesis):
     is_returns, _ = get_train_test_data()
-    # Get hypothesis from session state (safe)
-    hypothesis = st.session_state.get("current_hypothesis", "Fallback multi-factor hypothesis")
     price = (1 + is_returns["SPY"]).cumprod()
     p1, p2, p3, p4, p5, p6 = [int(x) for x in individual]
-    signal = (price.rolling(p1).mean() > price.rolling(p2).mean()).astype(int).diff().fillna(0)
+    
+    hyp_lower = hypothesis.lower()
+    if "satellite" in hyp_lower or "web traffic" in hyp_lower or "credit-card" in hyp_lower:
+        signal = (price.rolling(p1).mean() > price.rolling(p2).mean()).astype(int).diff().fillna(0)
+    elif "dark-pool" in hyp_lower or "order-flow" in hyp_lower:
+        signal = (is_returns["SPY"].diff(p3) > 0).astype(int).diff().fillna(0)
+    elif "volatility" in hyp_lower or "skew" in hyp_lower:
+        vol = is_returns["SPY"].rolling(p4).std()
+        signal = (vol < vol.quantile(0.6)).astype(int).diff().fillna(0)
+    else:
+        signal = (price.rolling(p1).mean() > price.rolling(p2).mean()).astype(int).diff().fillna(0)
+    
     strat_ret = signal.shift(1) * is_returns["SPY"]
     sharpe = (strat_ret.mean() / strat_ret.std() * np.sqrt(252)) if strat_ret.std() != 0 else 0.5
     return sharpe,
 
 toolbox.register("evaluate", evaluate)
-toolbox.register("mate", tools.cxTwoPoint)
-toolbox.register("mutate", tools.mutShuffleIndexes, indpb=0.5)
-toolbox.register("select", tools.selTournament, tournsize=8)
 
 def evolve_new_alpha():
-    # Generate LLM hypotheses only once per button press
     is_returns, _ = get_train_test_data()
     hypotheses = swarm_generate_hypotheses(is_returns)
-    st.session_state.current_hypothesis = hypotheses[0] if hypotheses else "Fallback hypothesis"
-
-    pop = toolbox.population(n=180)
-    algorithms.eaSimple(pop, toolbox, cxpb=0.8, mutpb=0.5, ngen=40, verbose=False)
     
-    best = tools.selBest(pop, 1)[0]
-    sharpe = best.fitness.values[0]
+    new_alphas = []
+    for i, hyp in enumerate(hypotheses[:5]):  # Generate 5 alphas per click
+        pop = toolbox.population(n=120)
+        def eval_with_hyp(individual):
+            return evaluate(individual, hyp)
+        toolbox.register("evaluate_hyp", eval_with_hyp)
+        algorithms.eaSimple(pop, toolbox, cxpb=0.7, mutpb=0.4, ngen=30, verbose=False)
+        
+        best = tools.selBest(pop, 1)[0]
+        sharpe = best.fitness.values[0]
+        
+        name = f"EvoAlpha_{random.randint(10000,99999)}"
+        desc = f"{hyp} – evolved through full Moonshot toolchain"
+        persistence = round(sharpe * 0.88, 2)
+        
+        save_alpha(name, desc, round(sharpe, 2), persistence)
+        new_alphas.append(name)
     
-    name = f"EvoAlpha_{random.randint(10000,99999)}"
-    desc = f"{st.session_state.current_hypothesis} – evolved through full Moonshot toolchain"
-    persistence = round(sharpe * 0.88, 2)
-    
-    save_alpha(name, desc, round(sharpe, 2), persistence)
-    st.success(f"✅ New alpha evolved: {name} | Sharpe {sharpe:.2f}")
+    st.success(f"✅ Generated {len(new_alphas)} new alphas from LLM hypotheses")
+    for name in new_alphas:
+        st.write(f"• {name} evolved")
