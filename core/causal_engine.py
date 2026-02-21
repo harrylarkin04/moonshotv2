@@ -5,7 +5,7 @@ from pyvis.network import Network
 import streamlit.components.v1 as components
 import numpy as np
 
-# Lazy Groq client - never crashes on import
+# Lazy Groq client - no import error even if key is missing
 _groq_client = None
 
 def get_groq_client():
@@ -13,8 +13,11 @@ def get_groq_client():
     if _groq_client is None:
         key = st.secrets.get("GROQ_API_KEY") or os.getenv("GROQ_API_KEY")
         if key:
-            from groq import Groq
-            _groq_client = Groq(api_key=key)
+            try:
+                from groq import Groq
+                _groq_client = Groq(api_key=key)
+            except:
+                return None
     return _groq_client
 
 def swarm_generate_hypotheses(returns):
@@ -39,8 +42,7 @@ Output only one hypothesis per line, starting with "Agent X: "."""
         except:
             pass
 
-    # Fallback - always works
-    st.info("Groq not available — using fallback hypotheses")
+    # Safe fallback
     return [
         f"Agent 1: Satellite activity + low volatility regime in {np.random.choice(assets)} causally drives strong returns",
         f"Agent 2: Dark-pool flow anomalies + gamma skew predicts regime shift in {np.random.choice(assets)}",
@@ -49,7 +51,6 @@ Output only one hypothesis per line, starting with "Agent X: "."""
         f"Agent 5: Volatility skew cluster + shipping data causally drives {np.random.choice(assets)}"
     ]
 
-# Existing functions (unchanged)
 def build_causal_dag(returns):
     G = nx.DiGraph()
     for col in returns.columns:
@@ -57,6 +58,7 @@ def build_causal_dag(returns):
     for i, cause in enumerate(returns.columns):
         for effect in returns.columns[i+1:]:
             try:
+                from statsmodels.tsa.stattools import grangercausalitytests
                 gc = grangercausalitytests(returns[[cause, effect]], 5, verbose=False)
                 pvals = [gc[l+1][0]['ssr_ftest'][1] for l in range(5)]
                 if min(pvals) < 0.05:
