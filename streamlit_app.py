@@ -4,7 +4,7 @@ from core.evo_factory import evolve_new_alpha
 
 st.set_page_config(page_title="MOONSHOT", layout="wide", page_icon="🌑", initial_sidebar_state="collapsed")
 
-# CYBERPUNK GLOBAL STYLE (glow + tilt + neon + no overflow)
+# FULL CYBERPUNK STYLE + AGGRESSIVE KILL FOR USERNAME SUGGESTIONS
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto+Mono:wght@300;400;700&display=swap');
@@ -87,10 +87,13 @@ body {
     transform: scale(1.05);
 }
 
-/* Kill username suggestions completely */
+/* AGGRESSIVE KILL FOR USERNAME SUGGESTIONS */
 input[type="text"][autocomplete="off"],
 input[type="text"][name="username"],
-input[type="text"][id="username"] {
+input[type="text"][id="unique_login_username"],
+input[type="text"][placeholder*="harry"],
+input[type="text"][placeholder*="andy"],
+input[type="text"][placeholder*="daniel"] {
     -webkit-text-fill-color: #fff !important;
     background: rgba(0,0,0,0.7) !important;
     border: 1px solid #00ff9f !important;
@@ -98,6 +101,8 @@ input[type="text"][id="username"] {
     appearance: none !important;
     -moz-appearance: none !important;
     -webkit-appearance: none !important;
+    background-image: none !important;
+    background-color: rgba(0,0,0,0.7) !important;
 }
 
 input:-internal-autofill-selected,
@@ -106,8 +111,10 @@ input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
 input:-webkit-autofill:active {
     -webkit-box-shadow: 0 0 0 30px rgba(0,0,0,0.7) inset !important;
+    box-shadow: 0 0 0 30px rgba(0,0,0,0.7) inset !important;
     background: rgba(0,0,0,0.7) !important;
     color: #fff !important;
+    text-fill-color: #fff !important;
 }
 
 /* Prevent text overflow in boxes */
