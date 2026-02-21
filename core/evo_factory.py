@@ -16,12 +16,11 @@ toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
 def evaluate(individual):
     is_returns, _ = get_train_test_data()
-    hypothesis = st.session_state.get("current_hypothesis", "Fallback hypothesis")
+    hypothesis = st.session_state.get("current_hypothesis", "Fallback multi-factor hypothesis")
     
     price = (1 + is_returns["SPY"]).cumprod()
     p1, p2, p3, p4, p5, p6 = [int(x) for x in individual]
     
-    # Hypothesis-driven multi-factor signal
     hyp_lower = hypothesis.lower()
     if "satellite" in hyp_lower or "web traffic" in hyp_lower or "credit-card" in hyp_lower:
         signal = (price.rolling(p1).mean() > price.rolling(p2).mean()).astype(int).diff().fillna(0)
@@ -40,12 +39,12 @@ def evaluate(individual):
 toolbox.register("evaluate", evaluate)
 
 def evolve_new_alpha():
-    # Generate fresh LLM hypotheses once per click
+    # Generate LLM hypotheses only once per button press
     is_returns, _ = get_train_test_data()
     hypotheses = swarm_generate_hypotheses(is_returns)
     
     new_count = 0
-    for hyp in hypotheses[:5]:  # Create 5 new alphas per click
+    for hyp in hypotheses[:5]:   # Generate 5 alphas per click
         st.session_state.current_hypothesis = hyp
         
         pop = toolbox.population(n=150)
@@ -62,5 +61,3 @@ def evolve_new_alpha():
         new_count += 1
     
     st.success(f"✅ Generated {new_count} new alphas from LLM hypotheses")
-    for i in range(new_count):
-        st.write(f"• New alpha created from hypothesis {i+1}")
