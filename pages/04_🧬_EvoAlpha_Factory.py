@@ -2,9 +2,6 @@ import streamlit as st
 from core.evo_factory import evolve_new_alpha
 from core.registry import get_top_alphas
 
-if 'logged_in' not in st.session_state or not st.session_state.logged_in:
-    st.switch_page("streamlit_app.py")
-
 st.title("🧬 EvoAlpha Factory")
 
 st.markdown("**Problem it obliterates:** Human quants + traditional autoML run out of ideas; new alphas get arbitraged in months.")
@@ -12,7 +9,7 @@ st.markdown("**Problem it obliterates:** Human quants + traditional autoML run o
 st.markdown("**How the tool works:** Closed-loop multi-agent system: Researcher agents mine untapped data and literature for hypotheses → Coder agents write & debug strategies → CausalForge validator checks robustness → Omniverse simulator stress-tests against adversaries → Evolutionary algorithms mutate the winners.")
 
 if st.button("🧬 EVOLVE NEW GENERATION NOW (Full Closed-Loop)", type="primary", use_container_width=True):
-    with st.spinner("Running full closed-loop evolution..."):
+    with st.spinner("Researcher swarm → Coder agents → CausalForge → Omniverse → Liquidity integration → Quantum mutation..."):
         evolve_new_alpha()
 
 st.subheader("Strategy Zoo")
