@@ -4,7 +4,7 @@ from core.evo_factory import evolve_new_alpha
 
 st.set_page_config(page_title="MOONSHOT", layout="wide", page_icon="🌑", initial_sidebar_state="collapsed")
 
-# CYBERPUNK STYLE - GLOWING NEON TITLES
+# ===================== CYBERPUNK STYLE (glowing titles, holographic tilt, neon buttons) =====================
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto+Mono:wght@300;400;700&display=swap');
@@ -12,11 +12,12 @@ st.markdown("""
 body {
     background: radial-gradient(circle at 50% 10%, #1a0033 0%, #05050f 70%);
     font-family: 'Roboto Mono', monospace;
+    overflow-x: hidden;
 }
 
 .big-title {
     font-family: 'Orbitron', sans-serif;
-    font-size: 5rem;
+    font-size: 5.2rem;
     font-weight: 900;
     background: linear-gradient(90deg, #00ff9f, #00b8ff, #ff00ff);
     -webkit-background-clip: text;
@@ -29,10 +30,62 @@ body {
     from { text-shadow: 0 0 20px #00ff9f, 0 0 40px #00b8ff; }
     to { text-shadow: 0 0 60px #00ff9f, 0 0 100px #00b8ff, 0 0 140px #ff00ff; }
 }
+
+.glass-box, .stMetric, .stDataFrame, .plotly-chart-container {
+    background: rgba(15,15,45,0.85);
+    backdrop-filter: blur(30px);
+    border: 2px solid #00ff9f;
+    border-radius: 16px;
+    box-shadow: 0 0 60px rgba(0,255,159,0.5);
+    transition: all 0.4s ease;
+}
+
+.glass-box:hover, .stMetric:hover, .stDataFrame:hover, .plotly-chart-container:hover {
+    transform: perspective(1000px) rotateX(8deg) rotateY(8deg) scale(1.02);
+    box-shadow: 0 0 100px rgba(0,255,159,0.9);
+}
+
+.stButton button {
+    background: transparent;
+    border: 2px solid #00ff9f;
+    color: #fff;
+    box-shadow: 0 0 25px #00ff9f;
+    transition: all 0.4s ease;
+    font-weight: 700;
+}
+
+.stButton button:hover {
+    background: rgba(0,255,159,0.15);
+    box-shadow: 0 0 60px #00ff9f, 0 0 100px #00b8ff;
+    transform: scale(1.05);
+}
+
+/* Kill username suggestions */
+input[type="text"][autocomplete="off"],
+input[type="text"][name="username"],
+input[type="text"][id="username"] {
+    -webkit-text-fill-color: #fff !important;
+    background: rgba(0,0,0,0.7) !important;
+    border: 1px solid #00ff9f !important;
+    color: #fff !important;
+    appearance: none !important;
+    -moz-appearance: none !important;
+    -webkit-appearance: none !important;
+}
+
+input:-internal-autofill-selected,
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px rgba(0,0,0,0.7) inset !important;
+    background: rgba(0,0,0,0.7) !important;
+    color: #fff !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
-# LOGIN PROTECTION
+# ==================== SECURE LOGIN ====================
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
@@ -40,8 +93,8 @@ if not st.session_state.logged_in:
     st.markdown('<p class="big-title" style="text-align:center">🌑 MOONSHOT</p>', unsafe_allow_html=True)
     st.markdown('<h2 style="text-align:center; color:#00ff9f;">ACCESS CONTROLLED</h2>', unsafe_allow_html=True)
 
-    username = st.text_input("Username", placeholder="harry / andy / daniel", autocomplete="off")
-    password = st.text_input("Password", type="password", placeholder="Enter password", autocomplete="off")
+    username = st.text_input("Username", key="login_username", autocomplete="off", placeholder="harry / andy / daniel")
+    password = st.text_input("Password", type="password", key="login_password", autocomplete="off", placeholder="Enter password")
 
     if st.button("LOGIN", type="primary", use_container_width=True):
         users = {
@@ -53,8 +106,9 @@ if not st.session_state.logged_in:
             st.session_state.logged_in = True
             st.rerun()
         else:
-            st.error("Invalid username or password")
+            st.error("Invalid credentials")
 else:
+    # MAIN APP CONTENT
     st.markdown('<p class="big-title" style="text-align:center">🌑 MOONSHOT</p>', unsafe_allow_html=True)
 
     col1, col2, col3, col4 = st.columns(4)
