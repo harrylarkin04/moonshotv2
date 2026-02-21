@@ -4,7 +4,7 @@ from core.evo_factory import evolve_new_alpha
 
 st.set_page_config(page_title="MOONSHOT", layout="wide", page_icon="🌑", initial_sidebar_state="collapsed")
 
-# ==================== CYBERPUNK STYLE ====================
+# ==================== CYBERPUNK GLOBAL STYLE ====================
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto+Mono:wght@300;400;700&display=swap');
@@ -12,6 +12,7 @@ st.markdown("""
 body {
     background: radial-gradient(circle at 50% 10%, #1a0033 0%, #05050f 70%);
     font-family: 'Roboto Mono', monospace;
+    overflow-x: hidden;
 }
 
 .big-title {
@@ -29,10 +30,34 @@ body {
     from { text-shadow: 0 0 20px #00ff9f, 0 0 40px #00b8ff; }
     to { text-shadow: 0 0 60px #00ff9f, 0 0 100px #00b8ff, 0 0 140px #ff00ff; }
 }
+
+.glass-box {
+    background: rgba(15,15,45,0.92);
+    backdrop-filter: blur(30px);
+    border: 2px solid #00ff9f;
+    border-radius: 28px;
+    padding: 60px;
+    box-shadow: 0 0 120px rgba(0,255,159,0.7);
+}
+
+.stButton button {
+    background: transparent;
+    border: 2px solid #00ff9f;
+    color: #fff;
+    box-shadow: 0 0 25px #00ff9f;
+    transition: all 0.4s ease;
+    font-weight: 700;
+}
+
+.stButton button:hover {
+    background: rgba(0,255,159,0.15);
+    box-shadow: 0 0 60px #00ff9f, 0 0 100px #00b8ff;
+    transform: scale(1.05);
+}
 </style>
 """, unsafe_allow_html=True)
 
-# ==================== SECURE LOGIN (protects everything) ====================
+# ==================== SECURE LOGIN (protects all pages) ====================
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
@@ -40,22 +65,28 @@ if not st.session_state.logged_in:
     st.markdown('<p class="big-title" style="text-align:center">🌑 MOONSHOT</p>', unsafe_allow_html=True)
     st.markdown('<h2 style="text-align:center; color:#00ff9f;">ACCESS CONTROLLED</h2>', unsafe_allow_html=True)
 
-    username = st.text_input("Username", placeholder="harry / andy / daniel")
-    password = st.text_input("Password", type="password")
+    with st.container():
+        st.markdown('<div class="glass-box">', unsafe_allow_html=True)
+        
+        username = st.text_input("Username", placeholder="harry / andy / daniel", autocomplete="off")
+        password = st.text_input("Password", type="password", placeholder="Enter password", autocomplete="off")
 
-    if st.button("LOGIN", type="primary", use_container_width=True):
-        users = {
-            "harry": "moonshot2026",
-            "andy": "andy2026",
-            "daniel": "daniel2026"
-        }
-        if username.lower() in users and password == users[username.lower()]:
-            st.session_state.logged_in = True
-            st.rerun()
-        else:
-            st.error("Invalid username or password")
+        if st.button("LOGIN", type="primary", use_container_width=True):
+            users = {
+                "harry": "moonshot2026",
+                "andy": "andy2026",
+                "daniel": "daniel2026"
+            }
+            if username.lower() in users and password == users[username.lower()]:
+                st.session_state.logged_in = True
+                st.rerun()
+            else:
+                st.error("Invalid username or password")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+
 else:
-    # MAIN APP
+    # ==================== MAIN APP ====================
     st.markdown('<p class="big-title" style="text-align:center">🌑 MOONSHOT</p>', unsafe_allow_html=True)
 
     col1, col2, col3, col4 = st.columns(4)
