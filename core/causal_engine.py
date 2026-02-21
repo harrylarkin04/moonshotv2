@@ -5,7 +5,11 @@ from pyvis.network import Network
 import streamlit.components.v1 as components
 import numpy as np
 
-# Safe Groq client - no crash on import
+# ==================== DEBUG GROQ ====================
+st.info(f"🔍 Debug: Secret key loaded = {'✅ YES' if st.secrets.get('GROQ_API_KEY') else '❌ NO'}")
+st.info(f"🔍 Debug: Env key loaded = {'✅ YES' if os.getenv('GROQ_API_KEY') else '❌ NO'}")
+
+# Lazy Groq client
 _groq_client = None
 
 def get_groq_client():
@@ -16,7 +20,9 @@ def get_groq_client():
             try:
                 from groq import Groq
                 _groq_client = Groq(api_key=key)
-            except:
+                st.success("✅ Groq client initialized successfully")
+            except Exception as e:
+                st.error(f"Groq init error: {e}")
                 return None
     return _groq_client
 
@@ -26,7 +32,7 @@ def swarm_generate_hypotheses(returns):
 
     prompt = f"""You are a swarm of 5 elite quant agents.
 Generate 5 distinct, novel multi-factor causal hypotheses for trading alphas using these assets: {assets}.
-Each hypothesis must suggest specific factors (satellite activity, dark-pool flow, web traffic, volatility skew, gamma cluster, order-flow, credit-card proxy, etc.) and how they causally drive returns.
+Each hypothesis must suggest specific factors and how they causally drive returns.
 Output only one hypothesis per line, starting with "Agent X: "."""
 
     if client:
@@ -39,11 +45,10 @@ Output only one hypothesis per line, starting with "Agent X: "."""
             )
             hypotheses = response.choices[0].message.content.strip().split("\n")
             return [h.strip() for h in hypotheses if h.strip() and h.startswith("Agent")]
-        except:
-            pass
+        except Exception as e:
+            st.warning(f"Groq API call failed: {e}")
 
-    # Fallback
-    st.info("Groq not available — using fallback hypotheses")
+    st.warning("Groq not available — using fallback hypotheses")
     return [
         f"Agent 1: Satellite activity + low volatility regime in {np.random.choice(assets)} causally drives strong returns",
         f"Agent 2: Dark-pool flow anomalies + gamma skew predicts regime shift in {np.random.choice(assets)}",
@@ -52,6 +57,7 @@ Output only one hypothesis per line, starting with "Agent X: "."""
         f"Agent 5: Volatility skew cluster + shipping data causally drives {np.random.choice(assets)}"
     ]
 
+# Your other functions
 def build_causal_dag(returns):
     G = nx.DiGraph()
     for col in returns.columns:
