@@ -39,12 +39,12 @@ def evaluate(individual):
 toolbox.register("evaluate", evaluate)
 
 def evolve_new_alpha():
-    # Generate LLM hypotheses only once per button press
+    # Generate LLM hypotheses once per button press
     is_returns, _ = get_train_test_data()
     hypotheses = swarm_generate_hypotheses(is_returns)
     
     new_count = 0
-    for hyp in hypotheses[:5]:   # Generate 5 alphas per click
+    for hyp in hypotheses[:5]:  # 5 alphas per click
         st.session_state.current_hypothesis = hyp
         
         pop = toolbox.population(n=150)
