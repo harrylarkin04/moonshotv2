@@ -2,6 +2,9 @@ import streamlit as st
 from core.evo_factory import evolve_new_alpha
 from core.registry import get_top_alphas
 
+if 'logged_in' not in st.session_state or not st.session_state.logged_in:
+    st.switch_page("streamlit_app.py")
+
 st.title("🧬 EvoAlpha Factory")
 
 st.markdown("**Problem it obliterates:** Human quants + traditional autoML run out of ideas; new alphas get arbitraged in months.")
