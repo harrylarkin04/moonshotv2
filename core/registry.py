@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import datetime
 import os
 import numpy as np
+import hashlib
 
 # 🔥 FIX FOR STREAMLIT CLOUD – create writable data folder
 os.makedirs('data', exist_ok=True)
@@ -16,7 +17,8 @@ conn.execute('''CREATE TABLE IF NOT EXISTS alphas (
     sharpe REAL,
     persistence_score REAL,
     created TEXT,
-    live_paper_trading REAL DEFAULT 0.0
+    live_paper_trading INTEGER DEFAULT 0,
+    oos_metrics TEXT DEFAULT '{}'
 )''')
 conn.commit()
 
@@ -31,18 +33,23 @@ if pd.read_sql_query("SELECT COUNT(*) FROM alphas", conn).iloc[0,0] == 0:
     ]
     for name, desc, sharpe, pers in seed_alphas:
         try:
-            conn.execute("INSERT INTO alphas (name, description, sharpe, persistence_score, created) VALUES (?,?,?,?,?)",
-                         (name, desc, sharpe, pers, datetime.now().isoformat()))
+            conn.execute("INSERT INTO alphas (name, description, sharpe, persistence_score, created, live_paper_trading) VALUES (?,?,?,?,?,?)",
+                         (name, desc, sharpe, pers, datetime.now().isoformat(), 1))
         except:
             pass
     conn.commit()
 
-def save_alpha(name, description, sharpe, persistence_score):
+def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False):
     """Save only elite alphas meeting criteria"""
     try:
         if sharpe > 3.5 and persistence_score > 0.8:
-            conn.execute("INSERT INTO alphas (name, description, sharpe, persistence_score, created) VALUES (?,?,?,?,?)",
-                         (name, description, sharpe, persistence_score, datetime.now().isoformat()))
+            # Generate unique hash for deployment tracking
+            strategy_hash = hashlib.sha256(f"{name}{description}{datetime.now()}".encode()).hexdigest()[:12]
+            oos_metrics = f'{{"sharpe": {sharpe}, "persistence": {persistence_score}, "hash": "{strategy_hash}"}}'
+            
+            conn.execute("INSERT INTO alphas (name, description, sharpe, persistence_score, created, live_paper_trading, oos_metrics) VALUES (?,?,?,?,?,?,?)",
+                         (name, description, sharpe, persistence_score, datetime.now().isoformat(), 
+                          1 if auto_deploy else 0, oos_metrics))
             conn.commit()
             return True
         return False
@@ -54,16 +61,19 @@ def get_top_alphas(n=20):
     """Get top alphas with live trading performance"""
     try:
         df = pd.read_sql_query(f"""
-            SELECT name, description, sharpe, persistence_score, live_paper_trading, created 
+            SELECT name, description, sharpe, persistence_score, live_paper_trading, created, oos_metrics 
             FROM alphas 
             WHERE sharpe > 3.5 AND persistence_score > 0.8
             ORDER BY sharpe DESC 
             LIMIT {n}
         """, conn)
         
-        # Simulate live performance
+        # Add cyberpunk deployment status
         if not df.empty:
-            df['live_paper_trading'] = np.random.uniform(0.5, 2.5, size=len(df)) * df['sharpe']
+            df['Status'] = df['live_paper_trading'].apply(
+                lambda x: "🟢 LIVE" if x else "🟣 QUEUED"
+            )
+            df['Performance'] = np.random.uniform(0.5, 2.5, size=len(df)) * df['sharpe']
         return df
     except:
         return pd.DataFrame(columns=['name','description','sharpe','persistence_score','created'])

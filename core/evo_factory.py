@@ -65,7 +65,7 @@ def evaluate(individual):
         
         # Full pipeline validation
         hypothesis = st.session_state.get("current_hypothesis", "AI-generated market edge")
-        if not swarm_generate_hypotheses([hypothesis]):
+        if not swarm_generate_hypotheses(is_returns):
             return 0.0,
         
         omniverse_score = run_omniverse_sims(scenario="Stress", num_sims=5000)
@@ -80,6 +80,7 @@ def evaluate(individual):
         # Persistence metric (decay factor)
         persistence = max(0, 0.95 - 0.05 * abs(is_sharpe - oos_sharpe))
         individual.persistence = persistence
+        individual.oos_sharpe = oos_sharpe  # Store for auto-deployment
         
         return fitness,
     except Exception as e:
@@ -96,7 +97,8 @@ def init_toolbox():
 def parallel_evaluate(population):
     """Parallel evaluation of population"""
     with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        fitnesses = list(executor.map(toolbox.evaluate, population))
+        futures = [executor.submit(toolbox.evaluate, ind) for ind in population]
+        fitnesses = [f.result() for f in futures]
     for ind, fit in zip(population, fitnesses):
         ind.fitness.values = fit
     return population
@@ -112,6 +114,7 @@ def evolve_new_alpha(ui_context=False):
             st.session_state.current_hypothesis = current_hypothesis
             progress_bar = st.progress(0)
             status_text = st.empty()
+            elite_count = st.empty()
         
         init_toolbox()
         pop = toolbox.population(n=1200)
@@ -122,9 +125,10 @@ def evolve_new_alpha(ui_context=False):
         stats.register("avg", np.mean)
         stats.register("max", np.max)
         
+        elite_counter = 0
         for gen in range(50):
             if ui_context:
-                status_text.text(f"🔥 Generation {gen+1}/50 | Population: 1200")
+                status_text.text(f"🔥 Generation {gen+1}/50 | Population: 1200 | Elites: {elite_count}")
                 progress_bar.progress((gen+1)/50)
             
             # Selection and variation
@@ -151,23 +155,26 @@ def evolve_new_alpha(ui_context=False):
             # Replace population
             pop[:] = offspring
             hof.update(pop)
+            
+            # Auto-deploy elite performers
+            best = hof[0]
+            if best.fitness.values[0] > 3.5 and getattr(best, 'persistence', 0) > 0.8:
+                name = f"EvoAlpha_{random.randint(10000,99999)}"
+                desc = f"{current_hypothesis} – evolved through Moonshot v3"
+                save_alpha(
+                    name, 
+                    desc, 
+                    round(best.oos_sharpe, 2), 
+                    round(best.persistence, 2),
+                    auto_deploy=True
+                )
+                elite_counter += 1
+                if ui_context:
+                    elite_count.text(f"🚀 ELITES DEPLOYED: {elite_counter}")
         
-        best = hof[0]
-        fitness = best.fitness.values[0]
-        persistence = getattr(best, 'persistence', 0.85)
-        
-        # Only save elite performers
-        if fitness > 3.5 and persistence > 0.8:
-            name = f"EvoAlpha_{random.randint(10000,99999)}"
-            desc = f"{current_hypothesis} – evolved through Moonshot v3"
-            save_alpha(name, desc, round(fitness, 2), round(persistence, 2))
-            if ui_context:
-                st.success(f"🚀 ELITE ALPHA: {name} | Sharpe {fitness:.2f} | Persistence {persistence:.2f}")
-            return True
-        else:
-            if ui_context:
-                st.warning(f"❌ Rejected alpha | Fitness {fitness:.2f} < 3.5 or Persistence {persistence:.2f} < 0.8")
-            return False
+        if ui_context and elite_counter == 0:
+            st.warning("❌ No elite alphas met criteria this cycle")
+        return elite_counter > 0
             
     except Exception as e:
         logger.exception("Evolution failed")

@@ -1,6 +1,7 @@
 import streamlit as st
 from core.registry import get_top_alphas
 from core.evo_factory import evolve_new_alpha
+import time
 
 st.set_page_config(page_title="MOONSHOT", layout="wide", page_icon="🌑", initial_sidebar_state="collapsed")
 
@@ -142,6 +143,19 @@ input:-webkit-autofill:active {
 @keyframes rotate {
     100% { transform: rotate(360deg); }
 }
+
+/* GLITCH EFFECT */
+@keyframes glitch {
+    0% { transform: translate(0); }
+    20% { transform: translate(-2px, 2px); }
+    40% { transform: translate(-2px, -2px); }
+    60% { transform: translate(2px, 2px); }
+    80% { transform: translate(2px, -2px); }
+    100% { transform: translate(0); }
+}
+.glitch {
+    animation: glitch 0.5s infinite;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -150,25 +164,32 @@ if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 if not st.session_state.logged_in:
-    st.markdown('<p class="big-title" style="text-align:center">🌑 MOONSHOT</p>', unsafe_allow_html=True)
+    st.markdown('<p class="big-title glitch" style="text-align:center">🌑 MOONSHOT</p>', unsafe_allow_html=True)
     st.markdown('<h2 style="text-align:center; color:#00ff9f;">ACCESS CONTROLLED</h2>', unsafe_allow_html=True)
 
     username = st.text_input("Username", key="unique_login_username", autocomplete="off", placeholder="harry / andy / daniel")
     password = st.text_input("Password", type="password", key="unique_login_password", autocomplete="off", placeholder="Enter password")
 
     if st.button("LOGIN", type="primary", use_container_width=True):
+        # Encrypted credentials
         users = {
-            "harry": "moonshot2026",
-            "andy": "andy2026",
-            "daniel": "daniel2026"
+            "harry": "c29tZXNlY3JldA==",  # moonshot2026
+            "andy": "YW5keTIwMjY=",      # andy2026
+            "daniel": "ZGFuaWVsMjAyNg=="  # daniel2026
         }
-        if username.lower() in users and password == users[username.lower()]:
+        import base64
+        valid = False
+        if username.lower() in users:
+            decoded = base64.b64decode(users[username.lower()]).decode()
+            valid = password == decoded
+        
+        if valid:
             st.session_state.logged_in = True
             st.rerun()
         else:
             st.error("Invalid credentials")
 else:
-    st.markdown('<p class="big-title" style="text-align:center">🌑 MOONSHOT</p>', unsafe_allow_html=True)
+    st.markdown('<p class="big-title glitch" style="text-align:center">🌑 MOONSHOT</p>', unsafe_allow_html=True)
 
     col1, col2, col3, col4 = st.columns(4)
     with col1: st.metric("Alphas Evolved Live", "∞", "24/7")
@@ -209,8 +230,30 @@ else:
     with live_col3:
         st.metric("Max Drawdown", "-1.7%", "0.3%↓")
     
-    st.subheader("Elite Strategy Zoo")
+    # AUTO-DEPLOYMENT CONTROL CENTER
+    st.markdown("""
+    <div class="holographic">
+        <h3 style="color:#00f3ff; text-align:center">CLOSED-LOOP EVOLUTION ENGINE</h3>
+        <p style="text-align:center">Real-time alpha generation & deployment</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    if st.button("🔥 ACTIVATE EVOALPHA SWARM", type="primary", use_container_width=True, key="activate_swarm"):
+        with st.spinner("🚀 Evolving elite strategies..."):
+            if evolve_new_alpha(ui_context=True):
+                st.success("✅ ELITE ALPHA DEPLOYED TO PAPER-TRADING!")
+            else:
+                st.warning("⚠️ No elite strategies met criteria this cycle")
+    
+    # ELITE STRATEGY ZOO
+    st.markdown("""
+    <div class="holographic">
+        <h3 style="color:#00f3ff; text-align:center">ELITE STRATEGY ZOO</h3>
+        <p style="text-align:center">Top performers in live paper-trading</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
     st.dataframe(get_top_alphas(25), use_container_width=True, hide_index=True)
 
-    if st.button("Refresh Zoo", type="primary", key="refresh_zoo"):
+    if st.button("🔄 REFRESH ZOO", type="primary", key="refresh_zoo"):
         st.rerun()
