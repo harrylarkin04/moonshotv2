@@ -22,49 +22,87 @@ creator.create("Individual", list, fitness=creator.FitnessMax)
 
 toolbox = base.Toolbox()
 toolbox.register("attr_int", random.randint, 5, 200)
-toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_int, n=8)
+toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_int, n=10)  # Increased parameters
 toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
 def backtest(individual, returns):
-    """Advanced backtesting with slippage, capacity modeling and drawdown monitoring"""
-    price = (1 + returns["SPY"]).cumprod()
-    p1, p2, p3, p4, p5, p6, p7, p8 = [int(x) for x in individual]
+    """Advanced backtesting with multi-asset support and walk-forward validation"""
+    if len(returns.columns) < 3:
+        raise ValueError("Insufficient assets for portfolio construction")
     
-    # Multi-factor strategy
-    sma_signal = (price.rolling(p1).mean() > price.rolling(p2).mean()).astype(int)
-    rsi = 100 - (100 / (1 + (returns["SPY"].rolling(p3).mean() / abs(returns["SPY"]).rolling(p3).mean())))
-    rsi_signal = (rsi > p4).astype(int)
-    volatility = returns["SPY"].rolling(p5).std()
-    position = (sma_signal * 0.6 + rsi_signal * 0.4) / volatility.clip(lower=0.01)
+    # Extract parameters
+    p1, p2, p3, p4, p5, p6, p7, p8, p9, p10 = [int(x) for x in individual]
     
-    # Position sizing with liquidity constraints
-    position = position.rolling(p6).mean().diff().fillna(0)
-    position = position.clip(lower=-1, upper=1) * p7 / 100.0
+    # Portfolio construction parameters
+    asset_weights = np.array([p1, p2, p3, p4])[:len(returns.columns)]
+    asset_weights = asset_weights / asset_weights.sum()
     
-    # Simulate execution impact
-    adv = 2e9  # Average daily volume
-    executed_returns = []
-    for idx, target_pos in enumerate(position):
-        if idx == 0: 
+    # Walk-forward validation
+    wf_results = []
+    for i in range(0, len(returns)-p9, p10):
+        chunk = returns.iloc[i:i+p9]
+        if len(chunk) < 30:  # Minimum data requirement
             continue
-        prev_pos = position.iloc[idx-1]
-        trajectory = optimal_execution_trajectory(adv, target_pos - prev_pos)
-        impact_cost = trajectory[0] * 0.0001  # 1bps impact
-        executed_returns.append(returns["SPY"].iloc[idx] - impact_cost)
+            
+        # Multi-asset strategy
+        signals = pd.DataFrame()
+        for col in returns.columns:
+            price = (1 + returns[col]).cumprod()
+            sma_signal = (price.rolling(p5).mean() > price.rolling(p6).mean()).astype(int)
+            rsi = 100 - (100 / (1 + (returns[col].rolling(p7).mean() / abs(returns[col]).rolling(p7).mean())))
+            rsi_signal = (rsi > p8).astype(int)
+            signals[col] = (sma_signal * 0.6 + rsi_signal * 0.4)
+        
+        # Position sizing with liquidity constraints
+        position = signals.rolling(p6).mean().diff().fillna(0)
+        position = position.clip(lower=-1, upper=1) * p7 / 100.0
+        
+        # Portfolio weighting
+        weighted_returns = (position * asset_weights).sum(axis=1)
+        
+        # Simulate execution impact
+        strat_ret = []
+        for idx in range(1, len(weighted_returns)):
+            prev_pos = position.iloc[idx-1]
+            curr_pos = position.iloc[idx]
+            position_change = (curr_pos - prev_pos) * asset_weights
+            
+            # Calculate impact cost for each asset
+            total_impact = 0
+            for j, col in enumerate(returns.columns):
+                adv = 2e9  # Average daily volume
+                trajectory = optimal_execution_trajectory(adv, position_change[j])
+                total_impact += trajectory[0] * 0.0001  # 1bps impact
+            
+            strat_ret.append(weighted_returns.iloc[idx] - total_impact)
+        
+        strat_ret = pd.Series(strat_ret)
+        cumulative = (1 + strat_ret).cumprod()
+        peak = cumulative.expanding(min_periods=1).max()
+        drawdown = (cumulative - peak) / peak
+        
+        sharpe = (strat_ret.mean() / strat_ret.std() * np.sqrt(252)) if strat_ret.std() != 0 else 0
+        max_drawdown = drawdown.min()
+        capacity = 1e9 * (1 / abs(position).max().max()) if position.abs().max().max() > 0 else 1e9
+        
+        wf_results.append({
+            'sharpe': sharpe,
+            'max_drawdown': max_drawdown,
+            'capacity': capacity
+        })
     
-    strat_ret = pd.Series(executed_returns)
-    cumulative = (1 + strat_ret).cumprod()
-    peak = cumulative.expanding(min_periods=1).max()
-    drawdown = (cumulative - peak) / peak
+    # Aggregate walk-forward results
+    if not wf_results:
+        return {'sharpe': 0, 'max_drawdown': 0, 'capacity': 0}
     
-    sharpe = (strat_ret.mean() / strat_ret.std() * np.sqrt(252)) if strat_ret.std() != 0 else 0
-    max_drawdown = drawdown.min()
-    capacity = 1e9 * (1 / abs(position).max()) if position.abs().max() > 0 else 1e9
+    avg_sharpe = np.mean([r['sharpe'] for r in wf_results])
+    avg_drawdown = np.mean([r['max_drawdown'] for r in wf_results])
+    avg_capacity = np.mean([r['capacity'] for r in wf_results])
     
     return {
-        'sharpe': sharpe,
-        'max_drawdown': max_drawdown,
-        'capacity': capacity
+        'sharpe': avg_sharpe,
+        'max_drawdown': avg_drawdown,
+        'capacity': avg_capacity
     }
 
 def evaluate(individual):
@@ -72,7 +110,7 @@ def evaluate(individual):
     try:
         is_returns, oos_returns = get_train_test_data()
         
-        # In-sample training
+        # In-sample training with walk-forward
         is_metrics = backtest(individual, is_returns)
         
         # Full pipeline validation
@@ -89,12 +127,16 @@ def evaluate(individual):
         # Out-of-sample validation
         oos_metrics = backtest(individual, oos_returns)
         
+        # Calculate overfitting penalty
+        overfit_penalty = abs(is_metrics['sharpe'] - oos_metrics['sharpe']) * 0.5
+        
         # Composite fitness score with strict criteria
         fitness = (
             oos_metrics['sharpe'] * 0.6 + 
             (1 - abs(oos_metrics['max_drawdown'])) * 0.2 +
             omniverse_score * 0.1 +
-            (1 - crowd_risk) * 0.1
+            (1 - crowd_risk) * 0.1 -
+            overfit_penalty
         )
         
         # Store metrics for elite selection
@@ -103,7 +145,8 @@ def evaluate(individual):
             'out_of_sample': oos_metrics,
             'causal_score': causal_score,
             'omniverse_score': omniverse_score,
-            'crowd_risk': crowd_risk
+            'crowd_risk': crowd_risk,
+            'overfit_penalty': overfit_penalty
         }
         
         return fitness,
@@ -112,11 +155,17 @@ def evaluate(individual):
         return 0.0,
 
 def init_toolbox():
-    """Initialize evolutionary operators with heavy mutation"""
+    """Initialize evolutionary operators with adaptive mutation"""
     toolbox.register("evaluate", evaluate)
     toolbox.register("select", tools.selTournament, tournsize=7)
     toolbox.register("mate", tools.cxBlend, alpha=0.8)
-    toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=0.3, indpb=0.4)  # Increased mutation
+    
+    # Adaptive mutation based on population diversity
+    def adaptive_mutate(individual):
+        sigma = 0.1 + (1 - tools.Statistics(lambda ind: ind.fitness.values[0])(toolbox.population(n=1))[0] / 10)
+        return tools.mutGaussian(individual, mu=0, sigma=sigma, indpb=0.4)
+    
+    toolbox.register("mutate", adaptive_mutate)
 
 def parallel_evaluate(population):
     """Parallel evaluation of population"""
@@ -140,15 +189,18 @@ def evolve_new_alpha(ui_context=False):
             status_text = st.empty()
             elite_count = st.empty()
             metrics_display = st.empty()
+            live_stats = st.empty()
         
         init_toolbox()
         pop = toolbox.population(n=1200)
         
         # Evolutionary loop
-        hof = tools.HallOfFame(1)
+        hof = tools.HallOfFame(5)  # Keep top 5 performers
         stats = tools.Statistics(lambda ind: ind.fitness.values[0])
         stats.register("avg", np.mean)
         stats.register("max", np.max)
+        stats.register("min", np.min)
+        stats.register("std", np.std)
         
         elite_counter = 0
         for gen in range(50):
@@ -156,8 +208,24 @@ def evolve_new_alpha(ui_context=False):
                 status_text.text(f"🔥 Generation {gen+1}/50 | Population: 1200 | Elites: {elite_counter}")
                 progress_bar.progress((gen+1)/50)
             
-            # Selection and variation
-            offspring = toolbox.select(pop, len(pop))
+            # Evaluate population
+            pop = parallel_evaluate(pop)
+            hof.update(pop)
+            
+            # Record and display stats
+            record = stats.compile(pop)
+            if ui_context:
+                live_stats.markdown(f"""
+                **Population Stats**  
+                Avg Fitness: `{record['avg']:.2f}`  
+                Max Fitness: `{record['max']:.2f}`  
+                Min Fitness: `{record['min']:.2f}`  
+                Diversity: `{record['std']:.4f}`
+                """)
+            
+            # Select next generation (elitism + offspring)
+            elites = tools.selBest(pop, int(len(pop)*0.05))  # Top 5%
+            offspring = toolbox.select(pop, len(pop) - len(elites))
             offspring = [toolbox.clone(ind) for ind in offspring]
             
             # Crossover with increased rate
@@ -167,7 +235,7 @@ def evolve_new_alpha(ui_context=False):
                     del child1.fitness.values
                     del child2.fitness.values
             
-            # Mutation
+            # Adaptive mutation
             for mutant in offspring:
                 if random.random() < 0.5:  # Higher mutation rate
                     toolbox.mutate(mutant)
@@ -177,35 +245,35 @@ def evolve_new_alpha(ui_context=False):
             invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
             invalid_ind = parallel_evaluate(invalid_ind)
             
-            # Replace population
-            pop[:] = offspring
-            hof.update(pop)
+            # Replace population (elites + offspring)
+            pop[:] = elites + offspring
             
             # Auto-deploy elite performers with strict criteria
-            best = hof[0]
-            metrics = getattr(best, 'metrics', {})
-            oos_metrics = metrics.get('out_of_sample', {})
-            
-            if (best.fitness.values[0] > 3.5 and 
-                oos_metrics.get('sharpe', 0) > 3.5 and 
-                oos_metrics.get('max_drawdown', 0) > -0.1 and 
-                metrics.get('omniverse_score', 0) > 0.7):
+            for best in hof:
+                metrics = getattr(best, 'metrics', {})
+                oos_metrics = metrics.get('out_of_sample', {})
                 
-                name = f"EvoAlpha_{random.randint(10000,99999)}"
-                desc = f"{current_hypothesis} – evolved through Moonshot v3"
-                
-                # Save with full metrics
-                if save_alpha(
-                    name, 
-                    desc, 
-                    round(oos_metrics['sharpe'], 2), 
-                    round(1 - abs(metrics['in_sample']['sharpe'] - oos_metrics['sharpe']), 2),
-                    metrics=json.dumps(metrics)
-                ):
-                    elite_counter += 1
-                    if ui_context:
-                        elite_count.text(f"🚀 ELITES DEPLOYED: {elite_counter}")
-                        metrics_display.json(metrics)
+                if (best.fitness.values[0] > 3.5 and 
+                    oos_metrics.get('sharpe', 0) > 3.5 and 
+                    oos_metrics.get('max_drawdown', 0) > -0.1 and 
+                    metrics.get('omniverse_score', 0) > 0.7 and
+                    metrics.get('overfit_penalty', 1) < 0.3):  # Low overfitting
+                    
+                    name = f"EvoAlpha_{random.randint(10000,99999)}"
+                    desc = f"{current_hypothesis} – evolved through Moonshot v4"
+                    
+                    # Save with full metrics
+                    if save_alpha(
+                        name, 
+                        desc, 
+                        round(oos_metrics['sharpe'], 2), 
+                        round(1 - abs(metrics['in_sample']['sharpe'] - oos_metrics['sharpe']), 2),
+                        metrics=json.dumps(metrics)
+                    ):
+                        elite_counter += 1
+                        if ui_context:
+                            elite_count.text(f"🚀 ELITES DEPLOYED: {elite_counter}")
+                            metrics_display.json(metrics)
         
         if ui_context and elite_counter == 0:
             st.warning("❌ No elite alphas met strict criteria this cycle")
