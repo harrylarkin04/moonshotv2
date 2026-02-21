@@ -4,6 +4,10 @@ import numpy as np
 import plotly.graph_objects as go
 from core.registry import get_top_alphas
 from core.data_fetcher import get_train_test_data
+
+if 'logged_in' not in st.session_state or not st.session_state.logged_in:
+    st.switch_page("streamlit_app.py")
+    
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto+Mono:wght@300;400;700&display=swap');
