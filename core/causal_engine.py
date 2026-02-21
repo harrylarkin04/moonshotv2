@@ -5,7 +5,7 @@ from pyvis.network import Network
 import streamlit.components.v1 as components
 import numpy as np
 
-# Lazy Groq client - no import error even if key is missing
+# Safe Groq client - no crash on import
 _groq_client = None
 
 def get_groq_client():
@@ -42,7 +42,8 @@ Output only one hypothesis per line, starting with "Agent X: "."""
         except:
             pass
 
-    # Safe fallback
+    # Fallback
+    st.info("Groq not available — using fallback hypotheses")
     return [
         f"Agent 1: Satellite activity + low volatility regime in {np.random.choice(assets)} causally drives strong returns",
         f"Agent 2: Dark-pool flow anomalies + gamma skew predicts regime shift in {np.random.choice(assets)}",
