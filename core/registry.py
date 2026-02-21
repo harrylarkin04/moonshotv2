@@ -4,6 +4,7 @@ from datetime import datetime
 import os
 import numpy as np
 import hashlib
+import json
 
 # 🔥 FIX FOR STREAMLIT CLOUD – create writable data folder
 os.makedirs('data', exist_ok=True)
@@ -39,17 +40,22 @@ if pd.read_sql_query("SELECT COUNT(*) FROM alphas", conn).iloc[0,0] == 0:
             pass
     conn.commit()
 
-def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False):
-    """Save only elite alphas meeting criteria"""
+def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False, metrics=None):
+    """Save only elite alphas meeting strict criteria with full metrics"""
     try:
         if sharpe > 3.5 and persistence_score > 0.8:
             # Generate unique hash for deployment tracking
             strategy_hash = hashlib.sha256(f"{name}{description}{datetime.now()}".encode()).hexdigest()[:12]
-            oos_metrics = f'{{"sharpe": {sharpe}, "persistence": {persistence_score}, "hash": "{strategy_hash}"}}'
+            oos_metrics = {
+                'sharpe': sharpe,
+                'persistence': persistence_score,
+                'hash': strategy_hash,
+                'full_metrics': json.loads(metrics) if metrics else {}
+            }
             
             conn.execute("INSERT INTO alphas (name, description, sharpe, persistence_score, created, live_paper_trading, oos_metrics) VALUES (?,?,?,?,?,?,?)",
                          (name, description, sharpe, persistence_score, datetime.now().isoformat(), 
-                          1 if auto_deploy else 0, oos_metrics))
+                          1 if auto_deploy else 0, json.dumps(oos_metrics)))
             conn.commit()
             return True
         return False
@@ -58,7 +64,7 @@ def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False):
         return False
 
 def get_top_alphas(n=20):
-    """Get top alphas with live trading performance"""
+    """Get top alphas with live trading performance and cyberpunk status"""
     try:
         df = pd.read_sql_query(f"""
             SELECT name, description, sharpe, persistence_score, live_paper_trading, created, oos_metrics 
@@ -68,12 +74,17 @@ def get_top_alphas(n=20):
             LIMIT {n}
         """, conn)
         
-        # Add cyberpunk deployment status
+        # Add cyberpunk deployment status and metrics
         if not df.empty:
             df['Status'] = df['live_paper_trading'].apply(
                 lambda x: "🟢 LIVE" if x else "🟣 QUEUED"
             )
             df['Performance'] = np.random.uniform(0.5, 2.5, size=len(df)) * df['sharpe']
+            
+            # Parse metrics
+            df['Metrics'] = df['oos_metrics'].apply(
+                lambda x: json.loads(x) if x else {}
+            )
         return df
     except:
         return pd.DataFrame(columns=['name','description','sharpe','persistence_score','created'])

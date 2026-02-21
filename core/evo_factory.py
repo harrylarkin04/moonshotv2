@@ -4,10 +4,11 @@ import random
 import numpy as np
 import pandas as pd
 import logging
+import json
 from concurrent.futures import ProcessPoolExecutor
 from core.data_fetcher import get_train_test_data
 from core.registry import save_alpha
-from core.causal_engine import swarm_generate_hypotheses
+from core.causal_engine import swarm_generate_hypotheses, build_causal_dag
 from core.omniverse import run_omniverse_sims
 from core.shadow_crowd import simulate_cascade_prob
 from core.liquidity_teleporter import optimal_execution_trajectory
@@ -25,7 +26,7 @@ toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.att
 toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
 def backtest(individual, returns):
-    """Advanced backtesting with slippage and capacity modeling"""
+    """Advanced backtesting with slippage, capacity modeling and drawdown monitoring"""
     price = (1 + returns["SPY"]).cumprod()
     p1, p2, p3, p4, p5, p6, p7, p8 = [int(x) for x in individual]
     
@@ -52,35 +53,58 @@ def backtest(individual, returns):
         executed_returns.append(returns["SPY"].iloc[idx] - impact_cost)
     
     strat_ret = pd.Series(executed_returns)
+    cumulative = (1 + strat_ret).cumprod()
+    peak = cumulative.expanding(min_periods=1).max()
+    drawdown = (cumulative - peak) / peak
+    
     sharpe = (strat_ret.mean() / strat_ret.std() * np.sqrt(252)) if strat_ret.std() != 0 else 0
-    return sharpe
+    max_drawdown = drawdown.min()
+    capacity = 1e9 * (1 / abs(position).max()) if position.abs().max() > 0 else 1e9
+    
+    return {
+        'sharpe': sharpe,
+        'max_drawdown': max_drawdown,
+        'capacity': capacity
+    }
 
 def evaluate(individual):
-    """Full pipeline evaluation with OOS validation"""
+    """Full pipeline evaluation with OOS validation and Moonshot pipeline"""
     try:
         is_returns, oos_returns = get_train_test_data()
         
         # In-sample training
-        is_sharpe = backtest(individual, is_returns)
+        is_metrics = backtest(individual, is_returns)
         
         # Full pipeline validation
-        hypothesis = st.session_state.get("current_hypothesis", "AI-generated market edge")
         if not swarm_generate_hypotheses(is_returns):
             return 0.0,
+        
+        # Build causal DAG and validate relationships
+        G = build_causal_dag(is_returns)
+        causal_score = len(G.edges) / 100  # Normalize score
         
         omniverse_score = run_omniverse_sims(scenario="Stress", num_sims=5000)
         crowd_risk = simulate_cascade_prob()
         
         # Out-of-sample validation
-        oos_sharpe = backtest(individual, oos_returns)
+        oos_metrics = backtest(individual, oos_returns)
         
-        # Composite fitness score
-        fitness = (oos_sharpe * 0.7 + omniverse_score * 0.2 + (1 - crowd_risk) * 0.1)
+        # Composite fitness score with strict criteria
+        fitness = (
+            oos_metrics['sharpe'] * 0.6 + 
+            (1 - abs(oos_metrics['max_drawdown'])) * 0.2 +
+            omniverse_score * 0.1 +
+            (1 - crowd_risk) * 0.1
+        )
         
-        # Persistence metric (decay factor)
-        persistence = max(0, 0.95 - 0.05 * abs(is_sharpe - oos_sharpe))
-        individual.persistence = persistence
-        individual.oos_sharpe = oos_sharpe  # Store for auto-deployment
+        # Store metrics for elite selection
+        individual.metrics = {
+            'in_sample': is_metrics,
+            'out_of_sample': oos_metrics,
+            'causal_score': causal_score,
+            'omniverse_score': omniverse_score,
+            'crowd_risk': crowd_risk
+        }
         
         return fitness,
     except Exception as e:
@@ -88,11 +112,11 @@ def evaluate(individual):
         return 0.0,
 
 def init_toolbox():
-    """Initialize evolutionary operators"""
+    """Initialize evolutionary operators with heavy mutation"""
     toolbox.register("evaluate", evaluate)
     toolbox.register("select", tools.selTournament, tournsize=7)
     toolbox.register("mate", tools.cxBlend, alpha=0.8)
-    toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=0.2, indpb=0.3)
+    toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=0.3, indpb=0.4)  # Increased mutation
 
 def parallel_evaluate(population):
     """Parallel evaluation of population"""
@@ -104,7 +128,7 @@ def parallel_evaluate(population):
     return population
 
 def evolve_new_alpha(ui_context=False):
-    """Massive evolutionary run with 1000+ population"""
+    """Massive evolutionary run with 1000+ population and full pipeline validation"""
     try:
         is_returns, _ = get_train_test_data()
         hypotheses = swarm_generate_hypotheses(is_returns)
@@ -115,6 +139,7 @@ def evolve_new_alpha(ui_context=False):
             progress_bar = st.progress(0)
             status_text = st.empty()
             elite_count = st.empty()
+            metrics_display = st.empty()
         
         init_toolbox()
         pop = toolbox.population(n=1200)
@@ -128,23 +153,23 @@ def evolve_new_alpha(ui_context=False):
         elite_counter = 0
         for gen in range(50):
             if ui_context:
-                status_text.text(f"🔥 Generation {gen+1}/50 | Population: 1200 | Elites: {elite_count}")
+                status_text.text(f"🔥 Generation {gen+1}/50 | Population: 1200 | Elites: {elite_counter}")
                 progress_bar.progress((gen+1)/50)
             
             # Selection and variation
             offspring = toolbox.select(pop, len(pop))
             offspring = [toolbox.clone(ind) for ind in offspring]
             
-            # Crossover
+            # Crossover with increased rate
             for child1, child2 in zip(offspring[::2], offspring[1::2]):
-                if random.random() < 0.75:
+                if random.random() < 0.85:  # Higher crossover rate
                     toolbox.mate(child1, child2)
                     del child1.fitness.values
                     del child2.fitness.values
             
             # Mutation
             for mutant in offspring:
-                if random.random() < 0.45:
+                if random.random() < 0.5:  # Higher mutation rate
                     toolbox.mutate(mutant)
                     del mutant.fitness.values
             
@@ -156,24 +181,34 @@ def evolve_new_alpha(ui_context=False):
             pop[:] = offspring
             hof.update(pop)
             
-            # Auto-deploy elite performers
+            # Auto-deploy elite performers with strict criteria
             best = hof[0]
-            if best.fitness.values[0] > 3.5 and getattr(best, 'persistence', 0) > 0.8:
+            metrics = getattr(best, 'metrics', {})
+            oos_metrics = metrics.get('out_of_sample', {})
+            
+            if (best.fitness.values[0] > 3.5 and 
+                oos_metrics.get('sharpe', 0) > 3.5 and 
+                oos_metrics.get('max_drawdown', 0) > -0.1 and 
+                metrics.get('omniverse_score', 0) > 0.7):
+                
                 name = f"EvoAlpha_{random.randint(10000,99999)}"
                 desc = f"{current_hypothesis} – evolved through Moonshot v3"
-                save_alpha(
+                
+                # Save with full metrics
+                if save_alpha(
                     name, 
                     desc, 
-                    round(best.oos_sharpe, 2), 
-                    round(best.persistence, 2),
-                    auto_deploy=True
-                )
-                elite_counter += 1
-                if ui_context:
-                    elite_count.text(f"🚀 ELITES DEPLOYED: {elite_counter}")
+                    round(oos_metrics['sharpe'], 2), 
+                    round(1 - abs(metrics['in_sample']['sharpe'] - oos_metrics['sharpe']), 2),
+                    metrics=json.dumps(metrics)
+                ):
+                    elite_counter += 1
+                    if ui_context:
+                        elite_count.text(f"🚀 ELITES DEPLOYED: {elite_counter}")
+                        metrics_display.json(metrics)
         
         if ui_context and elite_counter == 0:
-            st.warning("❌ No elite alphas met criteria this cycle")
+            st.warning("❌ No elite alphas met strict criteria this cycle")
         return elite_counter > 0
             
     except Exception as e:

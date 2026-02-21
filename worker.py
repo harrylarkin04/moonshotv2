@@ -17,10 +17,12 @@ print("🔥 1200+ strategy population • 50 generations • Elite selection onl
 while True:
     try:
         logger.info("Starting evolutionary cycle")
+        start_time = time.time()
         result = evolve_new_alpha(ui_context=False)
+        elapsed = time.time() - start_time
         status = "SUCCESS" if result else "NO_ELITE"
-        logger.info(f"Evolution completed: {status}")
-        time.sleep(45)
+        logger.info(f"Evolution completed in {elapsed:.1f}s: {status}")
+        time.sleep(60)  # Longer sleep between cycles
     except Exception as e:
         logger.error(f"Evolution crashed: {str(e)}")
         time.sleep(10)
