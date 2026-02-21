@@ -2,6 +2,7 @@ import streamlit as st
 from deap import base, creator, tools, algorithms
 import random
 import numpy as np
+import pandas as pd
 import logging
 from concurrent.futures import ProcessPoolExecutor
 from core.data_fetcher import get_train_test_data
