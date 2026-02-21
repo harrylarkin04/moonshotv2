@@ -4,7 +4,7 @@ from core.evo_factory import evolve_new_alpha
 
 st.set_page_config(page_title="MOONSHOT", layout="wide", page_icon="🌑", initial_sidebar_state="collapsed")
 
-# ==================== CYBERPUNK STYLE ====================
+# ==================== CYBERPUNK GLOBAL STYLE ====================
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto+Mono:wght@300;400;700&display=swap');
@@ -12,6 +12,7 @@ st.markdown("""
 body {
     background: radial-gradient(circle at 50% 10%, #1a0033 0%, #05050f 70%);
     font-family: 'Roboto Mono', monospace;
+    overflow-x: hidden;
 }
 
 .big-title {
@@ -29,10 +30,34 @@ body {
     from { text-shadow: 0 0 20px #00ff9f, 0 0 40px #00b8ff; }
     to { text-shadow: 0 0 60px #00ff9f, 0 0 100px #00b8ff, 0 0 140px #ff00ff; }
 }
+
+.glass-box {
+    background: rgba(15,15,45,0.92);
+    backdrop-filter: blur(30px);
+    border: 2px solid #00ff9f;
+    border-radius: 28px;
+    padding: 60px;
+    box-shadow: 0 0 120px rgba(0,255,159,0.7);
+}
+
+.stButton button {
+    background: transparent;
+    border: 2px solid #00ff9f;
+    color: #fff;
+    box-shadow: 0 0 25px #00ff9f;
+    transition: all 0.4s ease;
+    font-weight: 700;
+}
+
+.stButton button:hover {
+    background: rgba(0,255,159,0.15);
+    box-shadow: 0 0 60px #00ff9f, 0 0 100px #00b8ff;
+    transform: scale(1.05);
+}
 </style>
 """, unsafe_allow_html=True)
 
-# ==================== LOGIN PROTECTION ====================
+# ==================== SECURE LOGIN (protects all pages) ====================
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
@@ -67,12 +92,12 @@ else:
     st.subheader("The Five Weapons")
     cols = st.columns(5)
     modules = [
-        ("🌑 ShadowCrowd Oracle", "pages/01_🌑_ShadowCrowd_Oracle.py"),
-        ("🔬 CausalForge Engine", "pages/02_🔬_CausalForge_Engine.py"),
-        ("🌌 Financial Omniverse", "pages/03_🌌_Financial_Omniverse.py"),
-        ("🧬 EvoAlpha Factory", "pages/04_🧬_EvoAlpha_Factory.py"),
-        ("⚡ Liquidity Teleporter", "pages/05_⚡_Liquidity_Teleporter.py"),
-        ("📈 Live Alpha Execution Lab", "pages/06_📈_Live_Alpha_Execution_Lab.py")
+        ("ShadowCrowd Oracle", "pages/01_🌑_ShadowCrowd_Oracle.py"),
+        ("CausalForge Engine", "pages/02_🔬_CausalForge_Engine.py"),
+        ("Financial Omniverse", "pages/03_🌌_Financial_Omniverse.py"),
+        ("EvoAlpha Factory", "pages/04_🧬_EvoAlpha_Factory.py"),
+        ("Liquidity Teleporter", "pages/05_⚡_Liquidity_Teleporter.py"),
+        ("Live Alpha Execution Lab", "pages/06_📈_Live_Alpha_Execution_Lab.py")
     ]
     for col, (name, page) in zip(cols, modules):
         with col:
@@ -83,5 +108,5 @@ else:
     st.subheader("Live Alpha Zoo")
     st.dataframe(get_top_alphas(25), use_container_width=True, hide_index=True)
 
-    if st.button("🔄 Refresh Zoo", type="primary"):
+    if st.button("Refresh Zoo", type="primary"):
         st.rerun()
