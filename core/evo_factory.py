@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import logging
 import json
+import math
 from concurrent.futures import ProcessPoolExecutor
 from core.data_fetcher import get_train_test_data
 from core.registry import save_alpha
@@ -155,15 +156,32 @@ def evaluate(individual):
         return 0.0,
 
 def init_toolbox():
-    """Initialize evolutionary operators with adaptive mutation"""
+    """Initialize evolutionary operators with enhanced adaptive mutation"""
     toolbox.register("evaluate", evaluate)
     toolbox.register("select", tools.selTournament, tournsize=7)
     toolbox.register("mate", tools.cxBlend, alpha=0.8)
     
-    # Adaptive mutation based on population diversity
+    # Enhanced fitness-aware mutation
     def adaptive_mutate(individual):
-        sigma = 0.1 + (1 - tools.Statistics(lambda ind: ind.fitness.values[0])(toolbox.population(n=1))[0] / 10)
-        return tools.mutGaussian(individual, mu=0, sigma=sigma, indpb=0.4)
+        # Base mutation parameters
+        base_mutation_prob = 0.5
+        base_sigma = 0.1
+        
+        if hasattr(individual, 'fitness') and individual.fitness.valid:
+            fitness = individual.fitness.values[0]
+            
+            # Fitness-rank-based probability scaling
+            rank_factor = 1 / (1 + math.exp(-fitness))  # Sigmoid mapping
+            mutation_prob = base_mutation_prob * (1.5 - rank_factor)  # Higher mutation for lower fitness
+            
+            # Fitness-distance correlation for step size
+            sigma = base_sigma * (1.0 - rank_factor) + 0.01  # Smaller steps for higher fitness
+            
+            # Apply mutation with fitness-aware parameters
+            return tools.mutGaussian(individual, mu=0, sigma=sigma, indpb=mutation_prob)
+        else:
+            # Default mutation for unevaluated individuals
+            return tools.mutGaussian(individual, mu=0, sigma=base_sigma, indpb=base_mutation_prob)
     
     toolbox.register("mutate", adaptive_mutate)
 
