@@ -5,8 +5,6 @@ import plotly.graph_objects as go
 from core.registry import get_top_alphas
 from core.data_fetcher import get_train_test_data
 
-if 'logged_in' not in st.session_state or not st.session_state.logged_in:
-    st.switch_page("streamlit_app.py")
     
 st.markdown("""
 <style>
