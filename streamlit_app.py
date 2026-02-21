@@ -4,7 +4,6 @@ from core.evo_factory import evolve_new_alpha
 
 st.set_page_config(page_title="MOONSHOT", layout="wide", page_icon="🌑", initial_sidebar_state="collapsed")
 
-# ==================== CYBERPUNK GLOBAL STYLE ====================
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto+Mono:wght@300;400;700&display=swap');
@@ -12,7 +11,6 @@ st.markdown("""
 body {
     background: radial-gradient(circle at 50% 10%, #1a0033 0%, #05050f 70%);
     font-family: 'Roboto Mono', monospace;
-    overflow-x: hidden;
 }
 
 .big-title {
@@ -31,13 +29,18 @@ body {
     to { text-shadow: 0 0 60px #00ff9f, 0 0 100px #00b8ff, 0 0 140px #ff00ff; }
 }
 
-.glass-box {
-    background: rgba(15,15,45,0.92);
+.glass, .stMetric, .stDataFrame, .plotly-chart {
+    background: rgba(15,15,45,0.85);
     backdrop-filter: blur(30px);
     border: 2px solid #00ff9f;
-    border-radius: 28px;
-    padding: 60px;
-    box-shadow: 0 0 120px rgba(0,255,159,0.7);
+    border-radius: 16px;
+    box-shadow: 0 0 60px rgba(0,255,159,0.5);
+    transition: all 0.4s ease;
+}
+
+.glass:hover, .stMetric:hover, .stDataFrame:hover, .plotly-chart:hover {
+    transform: perspective(1000px) rotateX(8deg) rotateY(8deg) scale(1.02);
+    box-shadow: 0 0 100px rgba(0,255,159,0.9);
 }
 
 .stButton button {
@@ -57,7 +60,10 @@ body {
 </style>
 """, unsafe_allow_html=True)
 
-# ==================== SECURE LOGIN (protects all pages) ====================
+# PROTECT ALL PAGES
+if 'logged_in' not in st.session_state or not st.session_state.logged_in:
+    st.switch_page("streamlit_app.py")
+
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
@@ -80,7 +86,6 @@ if not st.session_state.logged_in:
         else:
             st.error("Invalid username or password")
 else:
-    # MAIN APP
     st.markdown('<p class="big-title" style="text-align:center">🌑 MOONSHOT</p>', unsafe_allow_html=True)
 
     col1, col2, col3, col4 = st.columns(4)
