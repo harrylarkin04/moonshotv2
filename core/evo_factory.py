@@ -59,8 +59,8 @@ def evaluate(individual):
         
         complexity = len(individual) / 50.0
         
-        # IMPROVEMENT: Penalize low persistence more heavily
-        persistence_penalty = 0.5 if persistence < 0.7 else 1.0
+        # STRICTER: Penalize low persistence more heavily
+        persistence_penalty = 0.3 if persistence < 0.8 else 1.0
         
         return (sharpe * persistence_penalty, 
                 persistence, 
@@ -96,18 +96,19 @@ def evolve_new_alpha(ui_context=True):
         best_ind = tools.selBest(population, 1)[0]
         metrics = evaluate(best_ind)
         
-        # ENHANCED: Stricter criteria for elite alphas
-        if metrics[0] > 3.8 and metrics[1] > 0.85 and metrics[2] > 0.5:
+        # STRICTER: Elite criteria for alphas
+        if metrics[0] > 4.0 and metrics[1] > 0.88 and metrics[2] > 0.6:
             save_alpha(
                 name=f"EvolvedAlpha-{hash(tuple(best_ind)) % 1000000}",
                 description="Evolutionary strategy",
                 sharpe=metrics[0],
                 persistence_score=metrics[1],
                 diversity=metrics[2],
-                consistency=metrics[3]
+                consistency=metrics[3],
+                auto_deploy=True  # AUTO-DEPLOY ELITE ALPHAS
             )
             if ui_context:
-                st.toast("🔥 Elite alpha evolved and deployed!", icon="🚀")
+                st.toast("🔥 ELITE alpha evolved and deployed!", icon="🚀")
             logger.info(f"Evolved elite alpha: Sharpe={metrics[0]:.2f}, Persistence={metrics[1]:.2f}")
             return True
         logger.warning("No elite alpha met criteria this cycle")

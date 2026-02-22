@@ -56,7 +56,7 @@ body {
     transform: scale(1.05);
 }
 
-/* NEW HOLOGRAPHIC EFFECT */
+/* ENHANCED HOLOGRAPHIC EFFECT */
 .holographic-panel {
     background: linear-gradient(125deg, rgba(0,243,255,0.1), rgba(255,0,255,0.1));
     border: 1px solid rgba(0,243,255,0.5);
@@ -66,6 +66,7 @@ body {
     box-shadow: 0 0 50px rgba(0,243,255,0.2);
     position: relative;
     overflow: hidden;
+    text-align: center; /* CENTER CONTENT */
 }
 .holographic-panel::before {
     content: '';
@@ -118,7 +119,7 @@ if st.button("🚨 Run Live Herd Fingerprinting", type="primary"):
         crowding = build_exposure_graph()
         cascade = simulate_cascade_prob()
         
-        # NEW: Holographic metrics display
+        # ENHANCED: Centered holographic metrics
         col1, col2 = st.columns(2)
         with col1:
             st.markdown(f"""

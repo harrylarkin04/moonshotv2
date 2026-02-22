@@ -43,17 +43,13 @@ def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False, 
         return False
 
 def get_real_oos_metrics(strategy_fn):
-    """Real walk-forward validation with historical data and volume-adjusted slippage"""
+    """REALISTIC walk-forward validation with volume-adjusted slippage"""
     try:
-        full_data, _ = get_multi_asset_data(period="max")
+        # FIXED: Get full data with volume
+        full_data, _, volumes = get_multi_asset_data(period="max", include_volume=True)
         
-        # Historical walk-forward split - FIXED: dynamic split date
-        split_date = full_data.index[int(len(full_data)*0.7)]
-        train = full_data.loc[:split_date]
-        test = full_data.loc[split_date:]
-        
-        if test.empty:
-            logger.warning("Test period empty in OOS validation")
+        if full_data.empty:
+            logger.error("No data available for OOS validation")
             return {
                 'sharpe': 0,
                 'persistence': 0,
@@ -61,28 +57,43 @@ def get_real_oos_metrics(strategy_fn):
                 'period': 'N/A'
             }
         
-        returns = []
+        # Historical walk-forward split
+        split_idx = int(len(full_data)*0.7)
+        if split_idx < 10:
+            logger.error("Insufficient data for OOS split")
+            return {
+                'sharpe': 0,
+                'persistence': 0,
+                'max_drawdown': 0,
+                'period': 'N/A'
+            }
+            
+        train = full_data.iloc[:split_idx]
+        test = full_data.iloc[split_idx:]
+        test_volumes = volumes.iloc[split_idx:] if volumes is not None else None
+        
         portfolio_value = 1.0
         peak_value = 1.0
         max_drawdown = 0.0
+        returns = []
+        position = 0.0
         
-        # FIXED: Correct ADV calculation using volume data
-        # IMPROVEMENT: Use actual volume data instead of mean price
-        _, volume_data = get_multi_asset_data(period="max", include_volume=True)
-        if volume_data is None:
-            ADV = 1_000_000  # Fallback value
+        # ENHANCED: Realistic volume handling
+        if test_volumes is None or test_volumes.empty:
+            ADV = 1_000_000  # Fallback
         else:
-            test_volumes = volume_data.loc[split_date:]
             ADV = test_volumes.mean().mean()
         
-        position = 0.0  # Track current position
-        
+        # ENHANCED: More realistic trading simulation
         for i in range(1, len(test)):
-            row = test.iloc[i]
-            prev_row = test.iloc[i-1]
+            current_prices = test.iloc[i]
+            prev_prices = test.iloc[i-1]
             
-            asset_returns = (row / prev_row - 1).values
-            signal = strategy_fn(prev_row)
+            # Calculate asset returns
+            asset_returns = (current_prices / prev_prices - 1).values
+            
+            # Get strategy signal
+            signal = strategy_fn(prev_prices)
             
             # Calculate target position
             target_position = signal * portfolio_value
@@ -90,49 +101,49 @@ def get_real_oos_metrics(strategy_fn):
             # Calculate trade size
             trade = target_position - position
             
-            # ENHANCED: Volume-adjusted slippage model (5bp base + size impact)
+            # ENHANCED: Realistic volume-adjusted slippage
             trade_size = abs(trade)
-            slippage_bp = 5 + 20 * (trade_size / (0.1 * ADV)) ** 0.5
+            slippage_bp = 5 + 25 * (trade_size / (0.05 * ADV)) ** 0.7
             slippage = slippage_bp / 10000 * trade_size
             
             # Update position
             position = target_position
             
-            # Calculate return after slippage
-            executed_return = np.dot(asset_returns, target_position) - slippage
+            # Calculate portfolio return after slippage
+            portfolio_return = np.dot(asset_returns, position) - slippage
+            portfolio_value *= (1 + portfolio_return)
             
-            # Update portfolio metrics
-            portfolio_value *= (1 + executed_return)
+            # Update drawdown
             peak_value = max(peak_value, portfolio_value)
-            current_drawdown = (peak_value - portfolio_value) / peak_value
-            max_drawdown = max(max_drawdown, current_drawdown)
+            current_dd = (peak_value - portfolio_value) / peak_value
+            max_drawdown = max(max_drawdown, current_dd)
             
-            returns.append(executed_return)
+            returns.append(portfolio_return)
         
-        if len(returns) < 2:
-            logger.warning("Insufficient returns for OOS validation")
+        # Calculate performance metrics
+        returns_series = pd.Series(returns)
+        if len(returns_series) < 3:
+            logger.warning("Insufficient returns for metrics")
             return {
                 'sharpe': 0,
                 'persistence': 0,
-                'max_drawdown': 0,
-                'period': f'{split_date.date()}_to_{test.index[-1].date()}'
+                'max_drawdown': max_drawdown,
+                'period': f'{test.index[0].date()}_to_{test.index[-1].date()}'
             }
         
-        returns = np.array(returns)
-        ann_ret = np.mean(returns) * 252
-        ann_vol = np.std(returns) * np.sqrt(252)
-        sharpe = ann_ret / ann_vol if ann_vol > 0 else 0
+        ann_return = returns_series.mean() * 252
+        ann_vol = returns_series.std() * np.sqrt(252)
+        sharpe = ann_return / ann_vol if ann_vol > 0 else 0
         
-        # FIXED: Correct persistence calculation (monthly basis)
-        monthly_returns = pd.Series(returns, index=test.index[1:]).resample('M').apply(lambda x: (1+x).prod()-1)
-        positive_months = (monthly_returns > 0).sum()
-        persistence = positive_months / len(monthly_returns) if len(monthly_returns) > 0 else 0
+        # ENHANCED: Correct persistence calculation
+        monthly_returns = returns_series.resample('M').agg(lambda x: (1+x).prod()-1)
+        persistence = (monthly_returns > 0).mean() if not monthly_returns.empty else 0
         
         return {
             'sharpe': sharpe,
             'persistence': persistence,
             'max_drawdown': max_drawdown,
-            'period': f'{split_date.date()}_to_{test.index[-1].date()}'
+            'period': f'{test.index[0].date()}_to_{test.index[-1].date()}'
         }
     except Exception as e:
         logger.error(f"OOS validation failed: {str(e)}")
