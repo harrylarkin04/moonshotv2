@@ -5,7 +5,7 @@ plotly
 pyvis
 networkx
 yfinance
-deap==3.0.1
+deap
 scipy
 openai
 python-dotenv
