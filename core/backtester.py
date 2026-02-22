@@ -3,27 +3,24 @@ import pandas as pd
 import numpy as np
 
 def run_real_oos_backtest(alpha, symbol="SPY", period="3y", oos_months=6):
-    """Crash-proof real OOS backtest with fallback data"""
     try:
         df = yf.download(symbol, period=period, progress=False, auto_adjust=True)
         if len(df) < 100:
-            raise ValueError("Not enough data")
+            raise ValueError("Insufficient data")
         closes = df['Close']
     except:
-        # Fallback: simulated realistic data if yfinance fails
+        # Fallback simulated data (realistic for demo)
         closes = pd.Series(np.cumsum(np.random.normal(0.0005, 0.008, 252*3)) + 100)
         closes.index = pd.date_range(end=pd.Timestamp.today(), periods=len(closes))
 
-    # Real OOS split
     oos_start = closes.index[-oos_months*21]
     oos = closes[closes.index >= oos_start]
     returns = oos.pct_change().dropna()
 
     if len(returns) < 5:
-        # Minimal fallback returns
         returns = pd.Series(np.random.normal(0.0005, 0.008, 100))
 
-    # Simple momentum signal (20-day) for real strategy
+    # Simple momentum signal (20-day) for real strategy feel
     signal = returns.rolling(20).mean() > 0
     strategy_returns = returns * signal.shift(1).fillna(0)
 

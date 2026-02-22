@@ -6,7 +6,6 @@ from core.backtester import run_real_oos_backtest
 
 st.set_page_config(page_title="Live Alpha Execution Lab", layout="wide")
 
-# CYBERPUNK STYLE
 st.markdown("""
 <style>
     .stApp { background: linear-gradient(135deg, #0a0a0f 0%, #120022 50%, #1a0033 100%); color: #00f5ff; }
@@ -29,26 +28,14 @@ st.success(f"Running real OOS backtests on {len(alphas)} alphas...")
 
 results = []
 for alpha in alphas:
-    try:
-        result = run_real_oos_backtest(alpha)
-        results.append(result)
-    except Exception as e:
-        # Fallback so page never crashes
-        results.append({
-            "name": alpha.get("name", "Alpha"),
-            "sharpe": 0.0,
-            "persistence": alpha.get("persistence", 0.85),
-            "oos_return": 0.0,
-            "max_drawdown": 0.0,
-            "equity_curve": pd.Series([100000] * 100)
-        })
+    result = run_real_oos_backtest(alpha)
+    results.append(result)
 
 df = pd.DataFrame(results)
 st.dataframe(df[['name', 'sharpe', 'persistence', 'oos_return', 'max_drawdown']], use_container_width=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
 
-# Portfolio Chart
 st.markdown('<div class="glass-card">', unsafe_allow_html=True)
 st.subheader("Combined Portfolio Equity Curve (Real OOS)")
 portfolio = sum(r['equity_curve'] for r in results) / len(results)
