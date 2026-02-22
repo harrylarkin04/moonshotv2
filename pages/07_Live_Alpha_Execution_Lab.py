@@ -34,15 +34,28 @@ st.dataframe(df[['name', 'sharpe', 'persistence', 'oos_return', 'max_drawdown']]
 
 st.subheader("Combined Portfolio Equity Curve (Real OOS)")
 
-# ---------------- FIX STARTS HERE ----------------
-equity_curves = [pd.Series(r['equity_curve']) for r in results]
+# ---------------- FIXED EQUITY CURVE HANDLING ----------------
+equity_curves = []
 
-# Align all curves by index before averaging
+for r in results:
+    eq = r['equity_curve']
+    # If it's a DataFrame with 1 column, convert to Series
+    if isinstance(eq, pd.DataFrame) and eq.shape[1] == 1:
+        eq = eq.iloc[:, 0]
+    # If it's a DataFrame with multiple columns, optionally pick first column
+    elif isinstance(eq, pd.DataFrame) and eq.shape[1] > 1:
+        eq = eq.iloc[:, 0]  # you can change this if another column is preferred
+    # If it's a NumPy array, convert to Series
+    elif not isinstance(eq, pd.Series):
+        eq = pd.Series(eq)
+    equity_curves.append(eq)
+
+# Align all curves by index (outer join) and average
 portfolio = pd.concat(equity_curves, axis=1).mean(axis=1)
 
-# Ensure 1D Series for Plotly
+# Ensure 1D for Plotly
 portfolio = portfolio.squeeze()
-# ---------------- FIX ENDS HERE ----------------
+# ---------------- END FIX ----------------
 
 fig = px.line(
     x=portfolio.index,
