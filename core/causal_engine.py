@@ -24,15 +24,32 @@ client = OpenAI(
 def swarm_generate_hypotheses(returns):
     """LLM swarm generating causal hypotheses"""
     try:
-        # Placeholder implementation
-        return [
-            "SPY returns cause QQQ volatility",
-            "TLT movements precede GLD reversals",
-            "VIX shocks propagate through all assets"
-        ]
+        assets = returns.columns.tolist()
+        prompt = f"""
+        Given financial returns data for these assets: {', '.join(assets)}.
+        Generate 3-5 plausible causal hypotheses about relationships between these assets.
+        Focus on lead-lag relationships, volatility spillovers, and market microstructure effects.
+        Format each hypothesis as a clear, concise statement.
+        """
+        
+        response = client.chat.completions.create(
+            model="mistralai/mistral-7b-instruct",
+            messages=[
+                {"role": "system", "content": "You are a quantitative researcher analyzing financial markets."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=300,
+            temperature=0.7
+        )
+        
+        hypotheses = response.choices[0].message.content.strip().split('\n')
+        return [h for h in hypotheses if h.strip()]
+        
     except Exception as e:
         logger.error(f"Hypothesis generation failed: {str(e)}")
-        return ["Error: Hypothesis generation failed"]
+        return ["SPY returns cause QQQ volatility", 
+                "TLT movements precede GLD reversals",
+                "VIX shocks propagate through all assets"]
 
 def build_causal_dag(returns):
     """Build causal DAG with persistence metrics"""

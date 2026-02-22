@@ -43,7 +43,7 @@ def evaluate(individual):
     try:
         # Convert individual to trading strategy function
         def strategy_fn(row):
-            return np.dot(individual, row.values) / len(individual)
+            return np.dot(individual, row) / len(individual)
         
         # Get real OOS metrics with slippage
         metrics = get_real_oos_metrics(strategy_fn)
@@ -92,6 +92,18 @@ def evaluate(individual):
             min_scenario_sharpe = min(omniverse_results)
             robustness = max(0.4, min_scenario_sharpe / sharpe) if sharpe > 0 else 0.4
         
+        # Save alpha with real OOS metrics
+        alpha_name = f"Alpha_{hash(tuple(individual)) % 1000000}"
+        save_alpha(
+            name=alpha_name,
+            description=f"Evolved strategy with complexity {complexity:.2f}",
+            sharpe=sharpe,
+            persistence_score=persistence,
+            diversity=diversity,
+            consistency=consistency,
+            returns_series=metrics.get('returns_series', [])
+        )
+        
         return (sharpe * persistence_penalty * robustness, 
                 persistence, 
                 diversity, 
@@ -101,8 +113,7 @@ def evaluate(individual):
                 max_drawdown)
     except Exception as e:
         logger.error(f"Evaluation failed: {str(e)}")
-        # Return demo-friendly values
-        return (3.5, 0.92, 0.8, 0.85, 0.7, 0.6, 0.1)
+        return (0, 0, 0, 0, 0, 0, 0)
 
 toolbox.register("evaluate", evaluate)
 toolbox.register("mate", tools.cxBlend, alpha=0.3)
@@ -111,35 +122,16 @@ toolbox.register("select", tools.selNSGA2)
 
 def evolve_new_alpha(ui_context=True):
     try:
-        # Create population and evolve
-        pop = toolbox.population(n=50)
-        hof = tools.HallOfFame(1)
-        stats = tools.Statistics(lambda ind: ind.fitness.values)
-        stats.register("avg", np.mean)
-        stats.register("std", np.std)
-        stats.register("min", np.min)
-        stats.register("max", np.max)
+        # Run evolution with real data
+        population = toolbox.population(n=50)
+        algorithms.eaSimple(population, toolbox, cxpb=0.5, mutpb=0.2, ngen=10, verbose=False)
         
-        # Run evolution
-        pop, log = algorithms.eaSimple(pop, toolbox, cxpb=0.5, mutpb=0.2, 
-                                       ngen=10, stats=stats, halloffame=hof, 
-                                       verbose=True)
-        
-        # Save best alpha
-        best = hof[0]
-        metrics = get_real_oos_metrics(lambda row: np.dot(best, row.values) / len(best))
-        name = f"Quantum Alpha {random.randint(1000,9999)}"
-        save_alpha(
-            name=name,
-            description="Evolved strategy",
-            sharpe=metrics['sharpe'],
-            persistence_score=metrics['persistence'],
-            diversity=1 - metrics['max_drawdown'],
-            consistency=metrics['persistence']
-        )
+        # Save best individual
+        best_ind = tools.selBest(population, 1)[0]
+        evaluate(best_ind)
         
         if ui_context:
-            st.toast(f"🔥 ELITE alpha {name} evolved and deployed!", icon="🚀")
+            st.toast("🔥 ELITE alpha evolved and deployed!", icon="🚀")
         return True
     except Exception as e:
         logger.error(f"Evolution failed: {str(e)}\n{traceback.format_exc()}")

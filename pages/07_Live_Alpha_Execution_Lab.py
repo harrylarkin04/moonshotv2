@@ -2,9 +2,7 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 import json
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-from core.registry import get_top_alphas
+from core.registry import get_top_alphas, create_performance_plots
 from core.data_fetcher import get_multi_asset_data
 
 st.markdown("""
@@ -71,7 +69,7 @@ if 'logged_in' not in st.session_state or not st.session_state.logged_in:
 st.title("📈 Live Alpha Execution Lab")
 st.caption("Real-time backtesting with slippage and transaction costs")
 
-# IMPROVEMENT: Add loading spinner
+# Load elite alphas
 with st.spinner("Fetching elite alphas..."):
     try:
         alphas = get_top_alphas(10)
@@ -83,62 +81,11 @@ if alphas.empty:
     st.warning("No elite alphas found. Run evolution first.")
     st.stop()
 
-def generate_performance_charts(returns):
-    """Generate interactive performance charts"""
-    # Calculate performance metrics
-    equity = (1 + returns).cumprod()
-    peak = equity.cummax()
-    drawdown = (equity - peak) / peak
-    
-    # Create figure with secondary y-axis
-    fig = make_subplots(specs=[[{"secondary_y": True}]])
-    
-    # Add equity curve
-    fig.add_trace(
-        go.Scatter(x=returns.index, y=equity, name="Equity", line=dict(color='#00ff9f')),
-        secondary_y=False,
-    )
-    
-    # Add drawdown
-    fig.add_trace(
-        go.Scatter(x=returns.index, y=drawdown, name="Drawdown", line=dict(color='#ff00ff')),
-        secondary_y=True,
-    )
-    
-    # Add markers for max drawdown
-    max_dd_idx = drawdown.idxmin()
-    fig.add_annotation(
-        x=max_dd_idx, y=drawdown.loc[max_dd_idx],
-        text=f"Max DD: {drawdown.loc[max_dd_idx]:.2%}",
-        showarrow=True,
-        arrowhead=1,
-        ax=0,
-        ay=40,
-        bgcolor="#ff00ff"
-    )
-    
-    # Format figure
-    fig.update_layout(
-        title='Performance Analysis',
-        template='plotly_dark',
-        hovermode="x unified",
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='white'),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-    )
-    
-    # Set y-axes titles
-    fig.update_yaxes(title_text="Equity", secondary_y=False)
-    fig.update_yaxes(title_text="Drawdown", secondary_y=True, tickformat=".0%")
-    
-    return fig
-
 for _, alpha in alphas.iterrows():
     with st.container():
         st.markdown(f"<div class='glass-panel'>", unsafe_allow_html=True)
         
-        # IMPROVEMENT: Enhanced header with persistence score
+        # Enhanced header with persistence score
         st.subheader(f"🔮 {alpha['name']}")
         st.caption(f"Persistence: {alpha.get('persistence_score', 0.0):.2f} | Diversity: {alpha.get('diversity', 0.0):.2f}")
         
@@ -149,7 +96,7 @@ for _, alpha in alphas.iterrows():
             except:
                 metrics = {}
         
-        # IMPROVEMENT: Better metric display
+        # Better metric display
         col1, col2, col3, col4 = st.columns(4)
         with col1:
             st.markdown("""
@@ -183,33 +130,34 @@ for _, alpha in alphas.iterrows():
             </div>
             """.format(alpha['consistency']), unsafe_allow_html=True)
         
-        # IMPROVEMENT: OOS metrics with period info
+        # Performance charts
+        returns_series = metrics.get('returns_series', [])
+        if returns_series:
+            equity_fig, drawdown_fig, monthly_fig = create_performance_plots(returns_series)
+            
+            if equity_fig and drawdown_fig and monthly_fig:
+                st.markdown("<div class='holo-divider'></div>", unsafe_allow_html=True)
+                st.subheader("Performance Analysis")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.plotly_chart(equity_fig, use_container_width=True)
+                with col2:
+                    st.plotly_chart(drawdown_fig, use_container_width=True)
+                st.plotly_chart(monthly_fig, use_container_width=True)
+            else:
+                st.warning("Failed to generate performance plots for this alpha.")
+        else:
+            st.warning("No returns series available for this alpha.")
+        
+        # OOS metrics with period info
         if metrics:
             st.markdown("<div class='holo-divider'></div>", unsafe_allow_html=True)
             st.caption(f"OOS Metrics ({metrics.get('period', 'N/A')}):")
             
             # Create expander for detailed metrics
-            with st.expander("Performance Analysis & Metrics"):
-                # Generate performance charts
-                if 'returns' in metrics and metrics['returns']:
-                    returns = pd.Series(metrics['returns'])
-                    st.plotly_chart(generate_performance_charts(returns), use_container_width=True)
-                
-                # Show detailed metrics table
-                st.subheader("Performance Metrics")
-                metric_data = {
-                    "Metric": ["Sharpe Ratio", "Calmar Ratio", "Max Drawdown", 
-                               "Win Rate", "Profit Factor", "Sortino Ratio"],
-                    "Value": [
-                        metrics.get('sharpe', 0),
-                        metrics.get('calmar', 0),
-                        f"{metrics.get('max_drawdown', 0):.2%}",
-                        f"{metrics.get('win_rate', 0):.2%}",
-                        metrics.get('profit_factor', 0),
-                        metrics.get('sortino', 0)
-                    ]
-                }
-                st.table(pd.DataFrame(metric_data))
+            with st.expander("View detailed OOS metrics"):
+                st.json(metrics)
         
         st.markdown("</div>", unsafe_allow_html=True)
         st.write("")  # Add spacing
