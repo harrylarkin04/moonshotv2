@@ -1,11 +1,12 @@
 import time
 import logging
 from core.evo_factory import evolve_new_alpha
+import traceback  # Added for better error logging
 
 logging.basicConfig(
     filename='logs/worker.log', 
     level=logging.INFO, 
-    format='%(asctime)s - %(message)s',
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     filemode='a'
 )
 
@@ -24,5 +25,5 @@ while True:
         logger.info(f"Evolution completed in {elapsed:.1f}s: {status}")
         time.sleep(60)  # Longer sleep between cycles
     except Exception as e:
-        logger.error(f"Evolution crashed: {str(e)}")
+        logger.error(f"Evolution crashed: {str(e)}\n{traceback.format_exc()}")
         time.sleep(10)

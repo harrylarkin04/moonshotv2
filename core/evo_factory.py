@@ -18,6 +18,7 @@ from core.omniverse import run_omniverse_sims
 from core.shadow_crowd import simulate_cascade_prob
 from core.liquidity_teleporter import optimal_execution_trajectory
 import streamlit as st
+import traceback  # Added for better error logging
 
 # Initialize logger
 logger = logging.getLogger('evo_factory')
@@ -44,7 +45,7 @@ def evaluate(individual):
         def strategy_fn(row):
             return np.dot(individual, row.values) / len(individual)
         
-        # Get real OOS metrics with slippage - FIXED: use actual OOS validation
+        # Get real OOS metrics with slippage
         metrics = get_real_oos_metrics(strategy_fn)
         
         sharpe = metrics['sharpe']
@@ -114,7 +115,7 @@ def evolve_new_alpha(ui_context=True):
         logger.warning("No elite alpha met criteria this cycle")
         return False
     except Exception as e:
-        logger.error(f"Evolution failed: {str(e)}")
+        logger.error(f"Evolution failed: {str(e)}\n{traceback.format_exc()}")  # Enhanced logging
         if ui_context:
             st.error(f"Evolution failed: {str(e)}")
         return False

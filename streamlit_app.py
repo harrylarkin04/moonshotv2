@@ -216,8 +216,7 @@ else:
     with col3: st.metric("Crowding Risk", "0.2%", "↓98%")
     with col4: st.metric("Omniverse Futures", "487M", "live")
 
-    st.subheader("The Five Weapons")
-    # FIXED: Changed to 6 columns for 6 modules
+    st.subheader("The Six Weapons")  # FIXED: Updated from Five to Six
     cols = st.columns(6)
     modules = [
         ("ShadowCrowd Oracle", "pages/01_🌑_ShadowCrowd_Oracle.py"),
@@ -232,10 +231,10 @@ else:
             if st.button(name, use_container_width=True, type="primary", key=name):
                 st.switch_page(page)
 
-    # NEW: Neural network transition effect
+    # Neural network transition effect
     st.markdown('<div class="neural-transition"></div>', unsafe_allow_html=True)
 
-    # NEW LIVE TRADING SECTION
+    # LIVE TRADING SECTION
     st.subheader("🚀 LIVE PAPER-TRADING SIMULATION")
     st.markdown("""
     <div class="holographic">

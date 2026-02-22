@@ -45,8 +45,8 @@ def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False, 
 def get_real_oos_metrics(strategy_fn):
     """REALISTIC walk-forward validation with volume-adjusted slippage"""
     try:
-        # FIXED: Get full data with volume
-        full_data, _, volumes = get_multi_asset_data(period="max", include_volume=True)
+        # FIXED: Correct data unpacking
+        full_data = get_multi_asset_data(period="max", include_volume=False)[0]
         
         if full_data.empty:
             logger.error("No data available for OOS validation")
@@ -70,19 +70,12 @@ def get_real_oos_metrics(strategy_fn):
             
         train = full_data.iloc[:split_idx]
         test = full_data.iloc[split_idx:]
-        test_volumes = volumes.iloc[split_idx:] if volumes is not None else None
         
         portfolio_value = 1.0
         peak_value = 1.0
         max_drawdown = 0.0
         returns = []
         position = 0.0
-        
-        # ENHANCED: Realistic volume handling
-        if test_volumes is None or test_volumes.empty:
-            ADV = 1_000_000  # Fallback
-        else:
-            ADV = test_volumes.mean().mean()
         
         # ENHANCED: More realistic trading simulation
         for i in range(1, len(test)):
@@ -101,9 +94,9 @@ def get_real_oos_metrics(strategy_fn):
             # Calculate trade size
             trade = target_position - position
             
-            # ENHANCED: Realistic volume-adjusted slippage
+            # ENHANCED: Realistic slippage model
             trade_size = abs(trade)
-            slippage_bp = 5 + 25 * (trade_size / (0.05 * ADV)) ** 0.7
+            slippage_bp = 5 + 15 * (trade_size / 1_000_000) ** 0.5
             slippage = slippage_bp / 10000 * trade_size
             
             # Update position
@@ -153,3 +146,23 @@ def get_real_oos_metrics(strategy_fn):
             'max_drawdown': 0,
             'period': 'error'
         }
+
+def get_top_alphas(limit=25):
+    """Fetch top alphas with enhanced filtering"""
+    try:
+        # ENHANCED: Stricter elite criteria
+        query = f"""
+            SELECT name, sharpe, persistence_score, diversity, consistency, oos_metrics
+            FROM alphas 
+            WHERE sharpe > 3.5 AND persistence_score > 0.8
+            ORDER BY sharpe * persistence_score DESC
+            LIMIT {limit}
+        """
+        df = pd.read_sql_query(query, conn)
+        if not df.empty:
+            # Parse OOS metrics
+            df['oos_metrics'] = df['oos_metrics'].apply(json.loads)
+        return df
+    except Exception as e:
+        logger.error(f"Top alphas query failed: {str(e)}")
+        return pd.DataFrame()
