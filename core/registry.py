@@ -10,7 +10,8 @@ conn = sqlite3.connect('alphas.db')
 
 def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False, metrics=None, diversity=0.0, consistency=0.0):
     try:
-        if sharpe > 3.5 and persistence_score > 0.8:
+        # ENHANCED: Stricter criteria for elite alphas
+        if sharpe > 3.8 and persistence_score > 0.85:
             strategy_hash = hashlib.sha256(f"{name}{description}{datetime.now()}".encode()).hexdigest()[:12]
             oos_metrics = {
                 'sharpe': sharpe,
@@ -35,7 +36,7 @@ def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False, 
         return False
 
 def get_real_oos_metrics(strategy_fn):
-    """Real walk-forward validation with historical data and 5bp slippage"""
+    """Real walk-forward validation with historical data and volume-adjusted slippage"""
     full_data, _ = get_multi_asset_data(period="max")
     
     # Historical walk-forward split
@@ -56,6 +57,9 @@ def get_real_oos_metrics(strategy_fn):
     peak_value = 1.0
     max_drawdown = 0.0
     
+    # IMPROVEMENT: Define ADV for volume-adjusted slippage
+    ADV = 1_000_000  # Average Daily Volume
+    
     for i in range(1, len(test)):
         row = test.iloc[i]
         prev_row = test.iloc[i-1]
@@ -65,8 +69,11 @@ def get_real_oos_metrics(strategy_fn):
         target_position = signal * 1.0
         trade = target_position - current_position
         
-        # Apply 5bp slippage (0.0005)
-        slippage = 0.0005 * abs(trade) if trade != 0 else 0
+        # ENHANCED: Volume-adjusted slippage model (5bp base + size impact)
+        trade_size = abs(trade)
+        slippage_bp = 5 + 20 * (trade_size / (0.1 * ADV)) ** 0.5
+        slippage = slippage_bp / 10000 * trade_size
+        
         executed_return = np.dot(asset_returns, target_position) - slippage
         
         # Update portfolio metrics

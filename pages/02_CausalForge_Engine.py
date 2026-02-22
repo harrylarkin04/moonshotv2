@@ -111,13 +111,13 @@ if st.button("🔬 Build & Visualize Neural Causal DAG"):
         st.session_state.causal_dag = G  # Store for interaction
         st.success("Fully explainable causal DAG generated + persistence scores attached.")
 
-# NEW: Node selection for DAG interaction
+# ENHANCED: Interactive node selection
 if 'causal_dag' in st.session_state and st.session_state.causal_dag:
     st.subheader("Interactive Causal Analysis")
     nodes = list(st.session_state.causal_dag.nodes())
     selected_node = st.selectbox("Select node for details", nodes, index=0)
     
-    # Display node information
+    # Display node metrics
     node_metrics = st.session_state.causal_dag.nodes[selected_node].get('metrics', {})
     st.markdown(f"""
     <div class="node-info-panel">

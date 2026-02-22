@@ -217,7 +217,8 @@ else:
     with col4: st.metric("Omniverse Futures", "487M", "live")
 
     st.subheader("The Five Weapons")
-    cols = st.columns(5)
+    # FIXED: Changed to 6 columns for 6 modules
+    cols = st.columns(6)
     modules = [
         ("ShadowCrowd Oracle", "pages/01_🌑_ShadowCrowd_Oracle.py"),
         ("CausalForge Engine", "pages/02_🔬_CausalForge_Engine.py"),
