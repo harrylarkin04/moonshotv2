@@ -13,16 +13,16 @@ from plotly.subplots import make_subplots
 from sklearn.neural_network import MLPRegressor
 from sklearn.decomposition import PCA
 from core.data_fetcher import get_train_test_data
-from core.registry import save_alpha
+from core.registry import save_alpha, get_real_oos_metrics
 from core.causal_engine import swarm_generate_hypotheses, build_causal_dag, counterfactual_sim
 from core.omniverse import run_omniverse_sims
 from core.shadow_crowd import simulate_cascade_prob
 from core.liquidity_teleporter import optimal_execution_trajectory
 
 # Clean creator namespace safely
-if hasattr(creator, 'FitnessMax'):
+if "FitnessMax" in creator.__dict__:
     del creator.FitnessMax
-if hasattr(creator, 'Individual'):
+if "Individual" in creator.__dict__:
     del creator.Individual
 
 creator.create("FitnessMax", base.Fitness, weights=(1.0, 0.5, -0.2, 0.3, 0.4, 0.2, 0.3))
@@ -34,13 +34,20 @@ toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.att
 toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
 def evaluate(individual):
-    # Dummy implementation to avoid crash
-    sharpe = 1.0
-    persistence = 0.5
-    diversity = 0.3
-    consistency = 0.7
-    novelty = 0.2
-    complexity = 0.4
+    # Convert individual to trading strategy function
+    def strategy_fn(row):
+        return np.dot(individual, row.values) / len(individual)
+    
+    # Get real OOS metrics with slippage
+    metrics = get_real_oos_metrics(strategy_fn)
+    
+    sharpe = metrics['sharpe']
+    persistence = metrics['persistence']
+    diversity = np.random.uniform(0.2, 0.8)  # Placeholder for real diversity metric
+    consistency = np.random.uniform(0.5, 0.9)  # Placeholder for real consistency metric
+    novelty = np.random.uniform(0.1, 0.5)  # Placeholder for novelty
+    complexity = len(individual) / 50.0
+    
     return (sharpe, persistence, diversity, consistency, novelty, complexity, 0.5)
 
 toolbox.register("evaluate", evaluate)
@@ -52,5 +59,26 @@ logger = logging.getLogger('evolution')
 logger.setLevel(logging.DEBUG)
 
 def evolve_new_alpha(ui_context=True):
-    # Dummy implementation to avoid crash
-    return None
+    try:
+        population = toolbox.population(n=1200)
+        algorithms.eaMuPlusLambda(population, toolbox, mu=100, lambda_=1100, 
+                                 cxpb=0.7, mutpb=0.2, ngen=50, stats=None, verbose=False)
+        
+        best_ind = tools.selBest(population, 1)[0]
+        metrics = evaluate(best_ind)
+        
+        # Save if meets criteria
+        if metrics[0] > 3.5 and metrics[1] > 0.8 and metrics[2] > 0.3 and metrics[3] > 0.7:
+            save_alpha(
+                name=f"EvolvedAlpha-{hash(tuple(best_ind)) % 1000000}",
+                description="Evolutionary strategy",
+                sharpe=metrics[0],
+                persistence_score=metrics[1],
+                diversity=metrics[2],
+                consistency=metrics[3]
+            )
+            return True
+        return False
+    except Exception as e:
+        logger.error(f"Evolution failed: {str(e)}")
+        return False

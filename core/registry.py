@@ -11,18 +11,6 @@ conn = sqlite3.connect('alphas.db')
 def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False, metrics=None, diversity=0.0, consistency=0.0):
     try:
         if sharpe > 3.5 and persistence_score > 0.8 and diversity > 0.3 and consistency > 0.7:
-            # Real backtest with 5bp slippage
-            _, oos_returns = get_train_test_data()
-            strategy_returns = []
-            current_position = 0
-            for i in range(len(oos_returns)):
-                # Simulate execution with slippage
-                executed_return = oos_returns.iloc[i] * (1 - 0.0005)
-                strategy_returns.append(executed_return)
-            
-            sharpe = np.mean(strategy_returns)/np.std(strategy_returns)*np.sqrt(252)
-            persistence_score = len(strategy_returns)/100
-            
             strategy_hash = hashlib.sha256(f"{name}{description}{datetime.now()}".encode()).hexdigest()[:12]
             oos_metrics = {
                 'sharpe': sharpe,
@@ -47,29 +35,43 @@ def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False, 
         return False
 
 def get_real_oos_metrics(strategy_fn):
-    """Walk-forward validation with real historical data"""
+    """Walk-forward validation with real historical data and 5bp slippage"""
     full_data, _ = get_multi_asset_data(period="max")
     train = full_data.loc[:'2022-01-01']
     test = full_data.loc['2022-01-02':]
     
-    # Simulate strategy execution
     returns = []
     current_position = 0
-    for date, row in test.iterrows():
-        signal = strategy_fn(row)  # -1 to 1
+    for i in range(len(test)):
+        if i == 0:
+            continue  # Skip first row
+        
+        row = test.iloc[i]
+        prev_row = test.iloc[i-1]
+        
+        # Calculate returns
+        asset_returns = (row / prev_row - 1).values
+        
+        # Get signal from strategy
+        signal = strategy_fn(prev_row)  # -1 to 1
         target_position = signal * 1.0  # Full investment
         trade = target_position - current_position
         
-        # Apply 5bp slippage
-        executed_price = row * (1 - np.sign(trade)*0.0005)
-        returns.append((executed_price.pct_change().iloc[0]))
+        # Apply 5bp slippage (0.0005 = 5 basis points)
+        slippage = 0.0005 * np.sign(trade) if trade != 0 else 0
+        executed_return = np.dot(asset_returns, target_position) - abs(slippage)
+        
+        returns.append(executed_return)
         current_position = target_position
     
-    sharpe = np.mean(returns)/np.std(returns)*np.sqrt(252)
-    persistence = len(returns)/100  # Simplified metric
+    # Calculate metrics
+    returns = np.array(returns)
+    sharpe = np.mean(returns) / np.std(returns) * np.sqrt(252) if len(returns) > 1 else 0
+    persistence = len(returns) / 100  # Simplified persistence metric
+    
     return {
         'sharpe': sharpe,
         'persistence': persistence,
-        'max_drawdown': np.min(np.cumprod(1 + np.array(returns))),
+        'max_drawdown': np.min(1 + np.cumprod(1 + returns)) - 1 if len(returns) > 0 else 0,
         'period': '2022-01-02_to_2024-06-01'
     }
