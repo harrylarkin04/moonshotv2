@@ -7,6 +7,8 @@ from core.data_fetcher import get_multi_asset_data
 import pandas as pd
 import logging
 import os
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 # Initialize logger
 logger = logging.getLogger('registry')
@@ -31,7 +33,8 @@ def init_db():
                 live_paper_trading INTEGER DEFAULT 0,
                 oos_metrics TEXT,
                 diversity REAL,
-                consistency REAL
+                consistency REAL,
+                returns_series TEXT
             )
             """)
         logger.info("Database initialized")
@@ -41,7 +44,7 @@ def init_db():
 # Initialize database on import
 init_db()
 
-def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False, metrics=None, diversity=0.0, consistency=0.0):
+def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False, metrics=None, diversity=0.0, consistency=0.0, returns_series=None):
     try:
         # STRICTER: Increased elite criteria thresholds
         if sharpe > 3.0 and persistence_score > 0.85 and diversity > 0.6:
@@ -53,7 +56,8 @@ def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False, 
                 'diversity': diversity,
                 'consistency': consistency,
                 'backtest_period': '2020-01-01_to_2024-06-01',
-                'last_updated': datetime.now().isoformat()
+                'last_updated': datetime.now().isoformat(),
+                'returns_series': returns_series
             }
             
             with conn:
@@ -130,17 +134,17 @@ def get_real_oos_metrics(strategy_fn):
             'sharpe': max(0, sharpe),
             'persistence': persistence,
             'max_drawdown': abs(max_drawdown),
-            'returns': returns_list,
+            'returns_series': returns_list,
             'period': f'2020-01-01_to_2024-06-01'
         }
     except Exception as e:
         logger.error(f"OOS validation failed: {str(e)}")
         return {
-            'sharpe': 3.5,
-            'persistence': 0.92,
-            'max_drawdown': 0.1,
-            'returns': [],
-            'period': 'demo'
+            'sharpe': 0,
+            'persistence': 0,
+            'max_drawdown': 0,
+            'returns_series': [],
+            'period': 'error'
         }
 
 def get_top_alphas(limit=25):
@@ -166,3 +170,64 @@ def get_top_alphas(limit=25):
     except Exception as e:
         logger.error(f"Top alphas query failed: {str(e)}")
         return pd.DataFrame()
+
+def create_performance_plots(returns_series):
+    if not returns_series or len(returns_series) == 0:
+        return None, None, None
+    
+    try:
+        returns = pd.Series(returns_series)
+        # Generate date index for proper time series plotting
+        dates = pd.date_range(end=pd.Timestamp.today(), periods=len(returns), freq='B')
+        returns.index = dates
+        
+        equity = (1 + returns).cumprod()
+        drawdown = (equity / equity.cummax() - 1) * 100
+        
+        # Calculate performance metrics
+        ann_return = returns.mean() * 252
+        ann_vol = returns.std() * np.sqrt(252)
+        sharpe = ann_return / ann_vol if ann_vol > 0 else 0
+        max_dd = drawdown.min()
+        calmar = ann_return / (-max_dd/100) if max_dd < 0 else 0
+        
+        # Equity curve
+        fig1 = go.Figure()
+        fig1.add_trace(go.Scatter(x=equity.index, y=equity, mode='lines', name='Equity', line=dict(color='#00ff9f')))
+        fig1.update_layout(
+            title=f'Equity Curve | Sharpe: {sharpe:.2f} | Calmar: {calmar:.2f}',
+            template='plotly_dark',
+            hovermode='x unified',
+            margin=dict(l=20, r=20, t=40, b=20),
+            height=300
+        )
+        
+        # Drawdown chart
+        fig2 = go.Figure()
+        fig2.add_trace(go.Scatter(x=drawdown.index, y=drawdown, fill='tozeroy', name='Drawdown', 
+                                 fillcolor='rgba(255,0,0,0.3)', line=dict(color='#ff0055')))
+        fig2.update_layout(
+            title=f'Drawdown | Max DD: {max_dd:.2f}%',
+            template='plotly_dark',
+            yaxis=dict(ticksuffix='%'),
+            margin=dict(l=20, r=20, t=40, b=20),
+            height=300
+        )
+        
+        # Monthly returns
+        monthly_returns = equity.resample('M').last().pct_change().dropna() * 100
+        fig3 = go.Figure()
+        colors = ['#00ff9f' if x >= 0 else '#ff0055' for x in monthly_returns]
+        fig3.add_trace(go.Bar(x=monthly_returns.index, y=monthly_returns, marker_color=colors, name='Monthly Return'))
+        fig3.update_layout(
+            title='Monthly Returns',
+            template='plotly_dark',
+            yaxis=dict(ticksuffix='%'),
+            margin=dict(l=20, r=20, t=40, b=20),
+            height=300
+        )
+        
+        return fig1, fig2, fig3
+    except Exception as e:
+        logger.error(f"Plot generation failed: {str(e)}")
+        return None, None, None
