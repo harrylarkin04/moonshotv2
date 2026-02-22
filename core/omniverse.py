@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import plotly.express as px
 from core.data_fetcher import get_multi_asset_data
 
