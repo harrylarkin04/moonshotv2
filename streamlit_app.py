@@ -3,7 +3,7 @@ from core.registry import get_top_alphas
 
 st.set_page_config(page_title="MOONSHOT", layout="wide", page_icon="🌑")
 
-# ====================== YOUR CYBERPUNK STYLE ======================
+# ====================== YOUR ORIGINAL CYBERPUNK STYLE ======================
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto+Mono:wght@300;400;700&display=swap');
@@ -18,26 +18,34 @@ body { background: radial-gradient(circle at 50% 10%, #1a0033 0%, #05050f 70%); 
     text-shadow: 0 0 40px #00ff9f, 0 0 80px #00b8ff, 0 0 140px #ff00ff;
     text-align: center;
     margin: 20px 0 10px 0;
+    animation: neonpulse 1.8s ease-in-out infinite alternate;
 }
-.glass-box, .stMetric, .stDataFrame, .plotly-chart-container {
+@keyframes neonpulse { from { text-shadow: 0 0 30px #00ff9f, 0 0 60px #00b8ff; } to { text-shadow: 0 0 70px #00ff9f, 0 0 120px #00b8ff, 0 0 180px #ff00ff; } }
+
+.glass-box {
     background: rgba(15,15,45,0.9);
     backdrop-filter: blur(30px);
     border: 2px solid #00ff9f;
     border-radius: 16px;
     box-shadow: 0 0 60px rgba(0,255,159,0.6);
+    transition: all 0.4s ease;
+}
+.glass-box:hover {
+    transform: perspective(1000px) rotateX(8deg) rotateY(8deg) scale(1.03);
+    box-shadow: 0 0 110px rgba(0,255,159,0.9), 0 0 160px #ff00ff;
 }
 .stButton button {
     background: transparent;
     border: 2px solid #00ff9f;
     color: white;
+    box-shadow: 0 0 25px #00ff9f;
+    transition: all 0.4s ease;
     font-weight: 700;
-    padding: 1.2rem;
-    border-radius: 12px;
 }
 .stButton button:hover {
     background: rgba(0,255,159,0.15);
-    box-shadow: 0 0 70px #00ff9f, 0 0 120px #00b8ff;
-    transform: scale(1.05);
+    box-shadow: 0 0 70px #00ff9f, 0 0 120px #00b8ff, 0 0 160px #ff00ff;
+    transform: scale(1.08);
 }
 </style>
 """, unsafe_allow_html=True)
@@ -54,7 +62,7 @@ if not st.session_state.logged_in:
     password = st.text_input("Password", type="password", placeholder="", autocomplete="off")
 
     if st.button("ENTER THE GRID", type="primary", use_container_width=True):
-        users = {"joseph": "moonshot2026", "harry": "moonshot2026", "andy": "andy2026"}
+        users = {"joseph": "moonshot2026", "harry": "moonshot2026"}
         if username.lower() in users and password == users[username.lower()]:
             st.session_state.logged_in = True
             st.rerun()
@@ -62,7 +70,7 @@ if not st.session_state.logged_in:
             st.error("Invalid credentials")
     st.stop()
 
-# ====================== MAIN PAGE ======================
+# ====================== MAIN HOMEPAGE ======================
 st.markdown('<p class="big-title">🌑 MOONSHOT</p>', unsafe_allow_html=True)
 
 st.subheader("The Five Weapons")
