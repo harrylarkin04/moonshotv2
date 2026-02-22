@@ -77,9 +77,15 @@ def get_real_oos_metrics(strategy_fn):
     sharpe = np.mean(returns) / np.std(returns) * np.sqrt(252)
     persistence = (returns > 0).mean()  # Fraction of positive days
     
+    # Calculate max drawdown
+    cumulative = np.cumprod(1 + returns)
+    peak = cumulative.max()
+    trough = cumulative.min()
+    max_drawdown = (trough - peak) / peak
+    
     return {
         'sharpe': sharpe,
         'persistence': persistence,
-        'max_drawdown': np.min(1 + np.cumprod(1 + returns)) - 1,
+        'max_drawdown': max_drawdown,
         'period': '2022-01-02_to_2024-06-01'
     }

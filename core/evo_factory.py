@@ -3,7 +3,7 @@ import pandas as pd
 import logging
 import json
 import math
-from deap import base, creator,tools,algorithms
+from deap import base, creator, tools, algorithms
 import random
 from scipy.spatial.distance import euclidean, pdist, squareform, mahalanobis
 from scipy.linalg import inv
@@ -20,9 +20,9 @@ from core.shadow_crowd import simulate_cascade_prob
 from core.liquidity_teleporter import optimal_execution_trajectory
 
 # Clean creator namespace safely
-if 'FitnessMax' in creator.__dict__:
+if hasattr(creator, 'FitnessMax'):
     del creator.FitnessMax
-if 'Individual' in creator.__dict__:
+if hasattr(creator, 'Individual'):
     del creator.Individual
 
 creator.create("FitnessMax", base.Fitness, weights=(1.0, 0.5, -0.2, 0.3, 0.4, 0.2, 0.3))
@@ -43,12 +43,13 @@ def evaluate(individual):
     
     sharpe = metrics['sharpe']
     persistence = metrics['persistence']
-    diversity = 0.0  # Placeholder for real diversity metric
-    consistency = 0.0  # Placeholder for real consistency metric
+    max_drawdown = metrics['max_drawdown']
+    diversity = 1 - max_drawdown  # Higher diversity with lower drawdown
+    consistency = (sharpe > 0) * persistence  # Consistency combines sharpe and persistence
     novelty = 0.0  # Placeholder for novelty
     complexity = len(individual) / 50.0
     
-    return (sharpe, persistence, diversity, consistency, novelty, complexity, 0.5)
+    return (sharpe, persistence, diversity, consistency, novelty, complexity, max_drawdown)
 
 toolbox.register("evaluate", evaluate)
 toolbox.register("mate", tools.cxBlend, alpha=0.3)
@@ -61,8 +62,17 @@ logger.setLevel(logging.DEBUG)
 def evolve_new_alpha(ui_context=True):
     try:
         population = toolbox.population(n=1200)
-        algorithms.eaMuPlusLambda(population, toolbox, mu=100, lambda_=1100, 
-                                 cxpb=0.7, mutpb=0.2, ngen=50, stats=None, verbose=False)
+        algorithms.eaMuPlusLambda(
+            population, 
+            toolbox, 
+            mu=100, 
+            lambda_=1100, 
+            cxpb=0.7, 
+            mutpb=0.2, 
+            ngen=50, 
+            stats=None, 
+            verbose=False
+        )
         
         best_ind = tools.selBest(population, 1)[0]
         metrics = evaluate(best_ind)
