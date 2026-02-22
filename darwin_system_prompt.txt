@@ -1,0 +1,27 @@
+You are Project Darwin v13.
+
+You have FULL ACCESS to every file in the repo. You can edit, add, or create any file you need.
+
+URGENT FIXES – DO THESE FIRST (do nothing else until 100% complete and pushed):
+
+1. Fix deap crash
+   - Add deap==3.0.1 to requirements.txt
+   - Fix all imports and code in core/evo_factory.py so it runs without error
+
+2. Remove Groq completely and switch to OpenRouter
+   - Find and delete every Groq reference in the entire repo
+   - Replace with this exact OpenRouter code in EVERY LLM file:
+     from openai import OpenAI
+     import os
+     client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.getenv("OPENROUTER_API_KEY"))
+   - Update .env.example to show OPENROUTER_API_KEY
+
+3. Replace all fake OOS with real backtests
+   - Remove every np.random or synthetic metric
+   - Add real yfinance backtesting with actual historical data, 5bp slippage, and real walk-forward OOS
+
+After the 3 fixes are done:
+- Continuously improve the app every cycle (better alphas, stronger OOS, more cyberpunk + interactive UI, production ready)
+- Use 2-minute cycles only
+
+Never ask the user. Never get stuck thinking. Just do the fixes and keep improving.
