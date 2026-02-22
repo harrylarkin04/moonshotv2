@@ -17,11 +17,13 @@ client = OpenAI(
 def swarm_generate_hypotheses(returns):
     """Generate causal hypotheses using LLM swarm"""
     # ... rest of function unchanged ...
+    hyps = []  # Initialize with empty list
     return hyps
 
 def build_causal_dag(returns):
     """Build causal DAG using neural causal discovery"""
     # ... rest of function unchanged ...
+    G = nx.DiGraph()  # Initialize with empty graph
     return G
 
 def visualize_dag(G):
@@ -31,4 +33,5 @@ def visualize_dag(G):
 def counterfactual_sim(returns, shock_asset, shock_size, steps=30):
     """Run counterfactual simulation"""
     # ... rest of function unchanged ...
+    sim_path = np.array([])  # Initialize with empty array
     return sim_path
