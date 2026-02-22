@@ -98,6 +98,7 @@ st.markdown("""
         <span class="metric-badge">DRAWDOWN <10%</span>
         <span class="metric-badge">CAPACITY >$1B</span>
         <span class="metric-badge">DIVERSITY >0.3</span>
+        <span class="metric-badge">CONSISTENCY >0.7</span>  <!-- NEW METRIC -->
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -132,11 +133,21 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+# NEW: Evolution controls sidebar
+with st.sidebar.expander("⚙️ EVOLUTION PARAMETERS"):
+    st.session_state.pop_size = st.slider("Population Size", 500, 2000, 1200, 100)
+    st.session_state.max_gens = st.slider("Max Generations", 20, 100, 50, 5)
+    st.session_state.elite_rate = st.slider("Elite Rate", 0.01, 0.2, 0.05, 0.01)
+
+# Holographic visualization placeholder
+st.subheader("EVOLUTIONARY PERFORMANCE")
+hologram_placeholder = st.empty()
+
 if st.button("⚡ IGNITE EVOLUTIONARY FOUNDRY", type="primary", use_container_width=True, 
              help="Run full closed-loop evolution (takes 2-5 minutes)"):
     result_placeholder = st.empty()
     metrics_placeholder = st.empty()
-    with st.spinner("🚀 Launching 1000+ strategy swarm..."):
+    with st.spinner("🚀 Launching strategy swarm..."):
         start_time = time.time()
         if evolve_new_alpha(ui_context=True):
             elapsed = time.time() - start_time
@@ -144,7 +155,7 @@ if st.button("⚡ IGNITE EVOLUTIONARY FOUNDRY", type="primary", use_container_wi
         else:
             result_placeholder.warning("⚠️ Evolution completed - no elite alphas met strict criteria")
 
-st.subheader("ELITE STRATEGY ZOO (Sharpe >3.5 | Persistence >0.8 | Drawdown <10% | Diversity >0.3)")
+st.subheader("ELITE STRATEGY ZOO (Sharpe >3.5 | Persistence >0.8 | Drawdown <10% | Diversity >0.3 | Consistency >0.7)")
 top_alphas = get_top_alphas(25)
 if not top_alphas.empty:
     # Enhanced display with progress bars
@@ -153,8 +164,9 @@ if not top_alphas.empty:
         with col1:
             st.markdown(f"**{row['name']}**")
             st.caption(row['description'])
-            # Display diversity metric
+            # Display diversity and consistency metrics
             st.markdown(f"**Diversity:** `{row.get('diversity', 0.0):.3f}`")
+            st.markdown(f"**Consistency:** `{row.get('consistency', 0.0):.3f}`")
         with col2:
             # Sharpe progress
             sharpe_pct = min(row['sharpe'] / 5.0, 1.0)
@@ -186,13 +198,3 @@ if not top_alphas.empty:
         st.divider()
 else:
     st.warning("No elite strategies found")
-
-# Holographic visualization placeholder
-st.subheader("EVOLUTIONARY PERFORMANCE")
-st.markdown("""
-<div class="holographic-viz">
-    <h4 style="color:#00f3ff; text-align:center">HOLOGRAPHIC EVOLUTIONARY TRAJECTORY</h4>
-    <p style="text-align:center">3D visualization will appear during evolution</p>
-</div>
-""", unsafe_allow_html=True)
-viz_placeholder = st.empty()

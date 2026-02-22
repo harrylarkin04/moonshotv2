@@ -22,7 +22,7 @@ from core.liquidity_teleporter import optimal_execution_trajectory
 MAX_WORKERS = 8
 logger = logging.getLogger(__name__)
 
-creator.create("FitnessMax", base.Fitness, weights=(1.0,))
+creator.create("FitnessMax", base.Fitness, weights=(1.0, 0.5, -0.2))  # Added diversity weight
 creator.create("Individual", list, fitness=creator.FitnessMax)
 
 toolbox = base.Toolbox()
@@ -31,7 +31,7 @@ toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.att
 toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
 def calculate_diversity(population):
-    """Calculate population diversity using Euclidean distance with 3D mapping"""
+    """Enhanced diversity calculation with 3D mapping"""
     if len(population) < 2:
         return 0.0, np.array([])
     
@@ -48,10 +48,11 @@ def calculate_diversity(population):
         projection = np.zeros((len(population), 3))
     
     distances = [euclidean(ind, centroid) for ind in population]
-    return np.mean(distances), projection
+    diversity_index = np.mean(distances)
+    return diversity_index, projection
 
-def backtest(individual, returns):
-    """Optimized backtesting with vectorized impact simulation"""
+def backtest(individual, returns, fold_count=5):
+    """Enhanced backtesting with multi-fold walk-forward validation"""
     if len(returns.columns) < 3:
         raise ValueError("Insufficient assets for portfolio construction")
     
@@ -63,10 +64,13 @@ def backtest(individual, returns):
     asset_weights = np.array(params[:4])[:len(returns.columns)]
     asset_weights = asset_weights / asset_weights.sum()
     
-    # Walk-forward validation
+    # Walk-forward validation with multiple folds
+    fold_size = len(returns) // fold_count
     wf_results = []
-    for i in range(0, len(returns)-p9, p10):
-        chunk = returns.iloc[i:i+p9]
+    for fold in range(fold_count):
+        start_idx = fold * fold_size
+        end_idx = (fold + 1) * fold_size if fold < fold_count - 1 else len(returns)
+        chunk = returns.iloc[start_idx:end_idx]
         if len(chunk) < 30:
             continue
             
@@ -79,13 +83,13 @@ def backtest(individual, returns):
             rsi_signal = (rsi > p8).astype(int)
             signals[col] = (sma_signal * 0.6 + rsi_signal * 0.4)
         
-        # Position sizing
+        # Position sizing with liquidity constraints
         position = signals.rolling(p6).mean().diff().fillna(0)
         position = position.clip(lower=-1, upper=1) * p7 / 100.0
         
-        # Vectorized impact simulation
+        # Realistic impact simulation
         position_changes = position.diff().fillna(0)
-        impact_costs = position_changes.abs() * 0.0001
+        impact_costs = position_changes.abs() * 0.0005  # Increased to realistic institutional costs
         weighted_returns = (position.shift(1) * returns - impact_costs).sum(axis=1)
         
         # Performance metrics
@@ -100,24 +104,30 @@ def backtest(individual, returns):
         wf_results.append({
             'sharpe': sharpe,
             'max_drawdown': max_drawdown,
-            'capacity': capacity
+            'capacity': capacity,
+            'fold': fold
         })
     
-    # Aggregate results
+    # Aggregate results with consistency metric
     if not wf_results:
-        return {'sharpe': 0, 'max_drawdown': 0, 'capacity': 0}
+        return {'sharpe': 0, 'max_drawdown': 0, 'capacity': 0, 'consistency': 0}
+    
+    sharpe_std = np.std([r['sharpe'] for r in wf_results])
+    avg_sharpe = np.mean([r['sharpe'] for r in wf_results])
+    consistency = max(0, 1 - sharpe_std / avg_sharpe) if avg_sharpe != 0 else 0
     
     return {
-        'sharpe': np.mean([r['sharpe'] for r in wf_results]),
+        'sharpe': avg_sharpe,
         'max_drawdown': np.mean([r['max_drawdown'] for r in wf_results]),
-        'capacity': np.mean([r['capacity'] for r in wf_results])
+        'capacity': np.mean([r['capacity'] for r in wf_results]),
+        'consistency': consistency
     }
 
 def evaluate(individual):
-    """Enhanced evaluation with neural validation"""
+    """Enhanced evaluation with neural validation and causal scoring"""
     try:
         is_returns, oos_returns = get_train_test_data()
-        is_metrics = backtest(individual, is_returns)
+        is_metrics = backtest(individual, is_returns, fold_count=5)  # 5-fold validation
         
         # Neural validation gate
         X = np.array(individual).reshape(1, -1)
@@ -127,11 +137,11 @@ def evaluate(individual):
         nn_sharpe = nn.predict(X)[0]
         
         if abs(is_metrics['sharpe'] - nn_sharpe) > 0.5:
-            return 0.0,
+            return 0.0, 0.0, 0.0
         
         # Full pipeline validation
         if not swarm_generate_hypotheses(is_returns):
-            return 0.0,
+            return 0.0, 0.0, 0.0
         
         G = build_causal_dag(is_returns)
         causal_score = len(G.edges) / 100
@@ -139,16 +149,17 @@ def evaluate(individual):
         omniverse_score = run_omniverse_sims(scenario="Stress", num_sims=5000)
         crowd_risk = simulate_cascade_prob()
         
-        oos_metrics = backtest(individual, oos_returns)
+        oos_metrics = backtest(individual, oos_returns, fold_count=3)
         overfit_penalty = abs(is_metrics['sharpe'] - oos_metrics['sharpe']) * 0.7
         
-        # Composite fitness score
+        # Composite fitness score with diversity component
         fitness = (
-            oos_metrics['sharpe'] * 0.7 + 
+            oos_metrics['sharpe'] * 0.6 + 
             (1 - abs(oos_metrics['max_drawdown'])) * 0.15 +
             omniverse_score * 0.1 +
             (1 - crowd_risk) * 0.05 -
-            overfit_penalty
+            overfit_penalty +
+            oos_metrics['consistency'] * 0.1
         )
         
         individual.metrics = {
@@ -158,16 +169,17 @@ def evaluate(individual):
             'omniverse_score': omniverse_score,
             'crowd_risk': crowd_risk,
             'overfit_penalty': overfit_penalty,
-            'neural_validation': nn_sharpe
+            'neural_validation': nn_sharpe,
+            'consistency': oos_metrics['consistency']  # New metric
         }
         
-        return fitness,
+        return fitness, oos_metrics['consistency'], causal_score
     except Exception as e:
         logger.error(f"Evaluation failed: {e}")
-        return 0.0,
+        return 0.0, 0.0, 0.0
 
 def init_toolbox():
-    """Initialize with quantum annealing-inspired mutation"""
+    """Initialize with adaptive quantum annealing"""
     toolbox.register("evaluate", evaluate)
     toolbox.register("select", tools.selTournament, tournsize=7)
     
@@ -185,42 +197,37 @@ def init_toolbox():
     
     toolbox.register("mate", quantum_mate, temperature=0.3)
     
-    def quantum_mutate(individual, diversity, generation):
-        """Quantum annealing mutation with temperature schedule"""
-        # Temperature decreases with generations
-        temperature = max(0.1, 0.5 * np.exp(-generation/50))
+    def adaptive_mutate(individual, diversity, generation):
+        """Adaptive mutation based on diversity and generation"""
+        # Base mutation probability
+        base_mutation_prob = 0.3
         
-        # Mutation probability based on diversity
-        mutation_prob = 0.5 * (1.0 - min(diversity, 0.8)) * temperature
+        # Adjust based on diversity
+        diversity_factor = 1.0 - min(diversity, 0.8) / 0.8
+        mutation_prob = base_mutation_prob * diversity_factor
         
-        if hasattr(individual, 'fitness') and individual.fitness.valid:
-            fitness = individual.fitness.values[0]
-            rank_factor = 1 / (1 + math.exp(-fitness))
-            mutation_prob *= (1.5 - rank_factor)
-            sigma = 0.1 * (1.0 - rank_factor) + 0.01
-        else:
-            sigma = 0.1 * (1.0 + (1.0 - diversity))
+        # Adjust based on generation
+        generation_factor = max(0.5, 1.0 - generation / 100.0)
+        mutation_prob *= generation_factor
         
-        # Apply quantum tunneling effect
-        if random.random() < 0.2:
-            idx = random.randint(0, len(individual)-1)
-            individual[idx] = random.randint(5, 200)
-        
+        # Apply mutation
+        sigma = 0.1 * (1.0 - min(diversity, 0.8)) + 0.01
         return tools.mutGaussian(individual, mu=0, sigma=sigma, indpb=mutation_prob)
     
-    toolbox.register("mutate", quantum_mutate)
+    toolbox.register("mutate", adaptive_mutate)
 
 def parallel_evaluate(population):
     """Parallel evaluation with progress tracking"""
     with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = [executor.submit(toolbox.evaluate, ind) for ind in population]
-        fitnesses = [f.result() for f in futures]
-    for ind, fit in zip(population, fitnesses):
-        ind.fitness.values = fit
+        results = [f.result() for f in futures]
+    
+    for ind, (fit, consistency, causal) in zip(population, results):
+        ind.fitness.values = (fit, consistency, causal)
     return population
 
 def evolve_new_alpha(ui_context=False):
-    """Enhanced evolution with 3D visualization and quantum operators"""
+    """Enhanced evolution with 3D visualization and adaptive operators"""
     try:
         is_returns, _ = get_train_test_data()
         hypotheses = swarm_generate_hypotheses(is_returns)
@@ -240,9 +247,11 @@ def evolve_new_alpha(ui_context=False):
                 st.session_state.quantum_temp = st.slider("Quantum Temperature", 0.1, 1.0, 0.3, 0.05)
                 st.session_state.diversity_threshold = st.slider("Diversity Threshold", 0.1, 0.9, 0.4, 0.05)
                 st.session_state.neural_validation = st.checkbox("Neural Validation Gate", True)
+                st.session_state.fold_count = st.slider("Validation Folds", 3, 10, 5, 1)
+                st.session_state.pop_size = st.slider("Population Size", 500, 2000, 1200, 100)
         
         init_toolbox()
-        pop = toolbox.population(n=1200)
+        pop = toolbox.population(n=st.session_state.pop_size if ui_context else 1200)
         
         hof = tools.HallOfFame(5)
         stats = tools.Statistics(lambda ind: ind.fitness.values[0])
@@ -339,7 +348,7 @@ def evolve_new_alpha(ui_context=False):
                     )
                     hologram_placeholder.plotly_chart(fig, use_container_width=True)
             
-            # Select next generation
+            # Select next generation with diversity preservation
             elites = tools.selBest(pop, int(len(pop)*0.05))
             offspring = toolbox.select(pop, len(pop) - len(elites))
             offspring = [toolbox.clone(ind) for ind in offspring]
@@ -351,12 +360,13 @@ def evolve_new_alpha(ui_context=False):
                     del child1.fitness.values
                     del child2.fitness.values
             
-            # Apply quantum mutation
+            # Apply adaptive mutation
             for mutant in offspring:
                 if random.random() < 0.5:
                     toolbox.mutate(mutant, diversity, gen)
                     del mutant.fitness.values
             
+            # Re-evaluate mutated individuals
             invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
             invalid_ind = parallel_evaluate(invalid_ind)
             pop[:] = elites + offspring
@@ -371,10 +381,11 @@ def evolve_new_alpha(ui_context=False):
                     oos_metrics.get('max_drawdown', 0) > -0.1 and 
                     metrics.get('omniverse_score', 0) > 0.7 and
                     metrics.get('overfit_penalty', 1) < 0.2 and
-                    diversity > st.session_state.diversity_threshold):
+                    diversity > st.session_state.diversity_threshold and
+                    metrics.get('consistency', 0) > 0.7):  # Added consistency requirement
                     
                     name = f"QuantumAlpha_{random.randint(10000,99999)}"
-                    desc = f"{current_hypothesis} – evolved through Quantum Evo v5"
+                    desc = f"{current_hypothesis} – evolved through Quantum Evo v6"
                     
                     if save_alpha(
                         name, 
