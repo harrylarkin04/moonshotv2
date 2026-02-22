@@ -17,6 +17,7 @@ from core.registry import save_alpha, get_real_oos_metrics
 from core.omniverse import run_omniverse_sims
 from core.shadow_crowd import simulate_cascade_prob
 from core.liquidity_teleporter import optimal_execution_trajectory
+import streamlit as st
 
 # Clean creator namespace safely
 if hasattr(creator, 'FitnessMax'):

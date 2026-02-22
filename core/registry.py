@@ -4,6 +4,7 @@ import json
 from datetime import datetime
 import sqlite3
 from core.data_fetcher import get_train_test_data, get_multi_asset_data
+import pandas as pd
 
 conn = sqlite3.connect('alphas.db')
 
