@@ -227,7 +227,7 @@ else:
             if st.button(name, use_container_width=True, type="primary", key=name):
                 st.switch_page(page)
 
-    # Neural network transition effect
+    # NEW: Neural network transition effect
     st.markdown('<div class="neural-transition"></div>', unsafe_allow_html=True)
 
     # NEW LIVE TRADING SECTION

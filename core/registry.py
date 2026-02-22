@@ -88,9 +88,9 @@ def get_real_oos_metrics(strategy_fn):
     returns = np.array(returns)
     sharpe = np.mean(returns) / np.std(returns) * np.sqrt(252)
     
-    # FIX: Correct persistence calculation
-    positive_returns = returns[returns > 0]
-    persistence = len(positive_returns) / len(returns) if len(returns) > 0 else 0
+    # FIXED: Correct persistence calculation
+    positive_months = len([r for r in returns if r > 0])
+    persistence = positive_months / len(returns) if len(returns) > 0 else 0
     
     return {
         'sharpe': sharpe,
