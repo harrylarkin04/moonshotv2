@@ -2,15 +2,16 @@ import numpy as np
 import plotly.express as px
 from core.data_fetcher import get_multi_asset_data
 
-def run_omniverse_sims(returns_df, scenario="Base", num_sims=8000):
+def run_omniverse_sims(scenario="Base", num_sims=8000):
     """Run market simulations under different scenarios with asset correlations"""
-    if returns_df.empty:
-        return 0.0
+    _, returns = get_multi_asset_data(period="2y")
+    if returns.empty:
+        return pd.DataFrame()
     
     # Calculate mean and covariance from historical returns
-    mu = returns_df.mean().values
-    cov = returns_df.cov().values
-    n_assets = returns_df.shape[1]
+    mu = returns.mean().values
+    cov = returns.cov().values
+    n_assets = returns.shape[1]
     
     # Adjust parameters based on scenario
     if scenario == "Trump2+China":
@@ -30,9 +31,7 @@ def run_omniverse_sims(returns_df, scenario="Base", num_sims=8000):
         
         # Compute cumulative returns for each simulation
         market_cumulative = np.cumprod(1 + market_returns, axis=1)
-        final_values = market_cumulative[:, -1]
-        avg_final = np.mean(final_values)
-        return avg_final - 1.0
+        return market_cumulative
     except Exception as e:
         print(f"Error in omniverse simulation: {e}")
-        return 0.0
+        return pd.DataFrame()
