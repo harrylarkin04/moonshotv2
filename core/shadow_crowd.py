@@ -22,4 +22,7 @@ def build_exposure_graph():
     return round(corr.where(corr > 0.73).mean().mean() * 100, 1)
 
 def simulate_cascade_prob():
-    return round(np.random.uniform(1.9, 4.7), 1)
+    data, _ = get_multi_asset_data(period="1mo")
+    daily_vol = data.pct_change().std().mean() * 100
+    recent_drawdown = (1 - data.iloc[-1]/data.max()).mean() * 100
+    return round(min(9.9, daily_vol * recent_drawdown / 100), 1)
