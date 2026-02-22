@@ -180,7 +180,8 @@ if not top_alphas.empty:
             </div>
             """, unsafe_allow_html=True)
             
-            # Drawdown progressdd_pct = min(abs(row['max_drawdown']) / 0.2, 1.0)
+            # Drawdown progress
+            dd_pct = min(abs(row['max_drawdown']) / 0.2, 1.0)  # Fixed: added missing variable definition
             st.markdown(f"DRAWDOWN: `{row['max_drawdown']*100:.1f}%`")
             st.markdown(f"""
             <div class="progress-container">
