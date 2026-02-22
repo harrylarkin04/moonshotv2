@@ -7,6 +7,7 @@ import logging
 import json
 import math
 from concurrent.futures import ProcessPoolExecutor
+import plotly.graph_objects as go  # Added missing import
 from core.data_fetcher import get_train_test_data
 from core.registry import save_alpha
 from core.causal_engine import swarm_generate_hypotheses, build_causal_dag
