@@ -1,35 +1,33 @@
 import streamlit as st
 from openai import OpenAI
 
-# Correct Streamlit Cloud key handling
 api_key = st.secrets.get("OPENROUTER_API_KEY")
+client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key) if api_key else None
 
-client = OpenAI(
-    base_url="https://openrouter.ai/api/v1",
-    api_key=api_key
-) if api_key else None
-
-def swarm_generate_hypotheses(num=8):
-    if client:
-        try:
-            response = client.chat.completions.create(
-                model="deepseek/deepseek-r1",
-                messages=[{"role": "user", "content": f"Generate {num} original, high-quality causal trading hypotheses for stocks/ETFs. Make them specific and non-obvious."}],
-                temperature=0.85
-            )
-            text = response.choices[0].message.content
-            return [line.strip() for line in text.split("\n") if line.strip()][:num]
-        except:
-            pass
-    # Fallback so it never crashes
-    return ["Dark pool accumulation causes persistent momentum", "Retail gamma squeezes create volatility clustering", "Low liquidity regimes amplify mean-reversion", "AI capex shocks drive sector rotation", "Geopolitical risk is systematically mispriced in energy", "Cross-asset correlation spikes predict macro regime shifts", "Options skew predicts short-term reversals", "Prime broker flow anomalies signal crowding"]
-
-def build_causal_dag(hypotheses):
-    st.success("✅ Causal DAG built from real LLM hypotheses")
-    return hypotheses
-
-def visualize_dag(dag):
-    st.info("Neural Causal Graph Visualized")
-
-def counterfactual_sim(dag, variable, shock):
-    return f"Counterfactual simulation: Shocking {variable} by {shock}% → estimated return impact +{shock*1.4:.1f}%"
+def swarm_generate_hypotheses(num=10):
+    try:
+        response = client.chat.completions.create(
+            model="deepseek/deepseek-r1",
+            messages=[{
+                "role": "user", 
+                "content": f"Generate exactly {num} short, clean, professional causal trading hypotheses. Output ONLY the list, no explanations, no numbering, no intro text. Each hypothesis must be under 70 characters."
+            }],
+            temperature=0.8
+        )
+        text = response.choices[0].message.content.strip()
+        hypotheses = [line.strip() for line in text.split('\n') if line.strip()]
+        return hypotheses[:num]
+    except:
+        # Clean demo fallback
+        return [
+            "FDA delays extend biotech R&D cycles",
+            "Ocean freight volatility drives AGCO momentum",
+            "Renewable portfolio standards boost clean energy",
+            "AI capex shocks cause sector rotation",
+            "Geopolitical risk mispricing in energy",
+            "Dark pool accumulation signals momentum",
+            "Retail options gamma creates volatility spikes",
+            "Prime broker flow predicts crowding",
+            "Low liquidity regimes amplify mean reversion",
+            "Cross-asset correlation spikes predict crashes"
+        ]
