@@ -136,7 +136,7 @@ with st.container():
         'Weapon': ['ShadowCrowd', 'CausalForge', 'Omniverse', 'EvoAlpha', 'Liquidity', 'Execution'],
         'Edge ($B)': [2.1, 1.8, 3.2, 2.4, 1.2, 0.7]
     }
-    st.bar_chart(performance_data.set_index('Weapon'), use_container_width=True)
+    st.bar_chart(performance_data, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 # NEW: Neural transition effect
