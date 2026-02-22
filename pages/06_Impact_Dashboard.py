@@ -109,9 +109,10 @@ st.subheader("Live Portfolio Attribution & Alpha Performance")
 st.markdown('<div class="neural-transition"></div>', unsafe_allow_html=True)
 
 # ENHANCED: Add holographic panel
-st.markdown('<div class="holographic">', unsafe_allow_html=True)
-st.metric("Total Simulated Annual P&L Uplift (on $50B AUM)", "$11.4B", "from all 5 weapons combined")
-st.markdown('</div>', unsafe_allow_html=True)
+with st.container():
+    st.markdown('<div class="holographic">', unsafe_allow_html=True)
+    st.metric("Total Simulated Annual P&L Uplift (on $50B AUM)", "$11.4B", "from all 5 weapons combined")
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # NEW: Neural transition effect
 st.markdown('<div class="neural-transition"></div>', unsafe_allow_html=True)

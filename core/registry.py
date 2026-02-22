@@ -62,7 +62,6 @@ def get_real_oos_metrics(strategy_fn):
             }
         
         returns = []
-        current_position = 0
         portfolio_value = 1.0
         peak_value = 1.0
         max_drawdown = 0.0
@@ -77,7 +76,9 @@ def get_real_oos_metrics(strategy_fn):
             asset_returns = (row / prev_row - 1).values
             signal = strategy_fn(prev_row)
             target_position = signal * 1.0
-            trade = target_position - current_position
+            
+            # Calculate trade size
+            trade = target_position - (portfolio_value - 1.0)  # Position change
             
             # ENHANCED: Volume-adjusted slippage model (5bp base + size impact)
             trade_size = abs(trade)
@@ -89,12 +90,10 @@ def get_real_oos_metrics(strategy_fn):
             # Update portfolio metrics
             portfolio_value *= (1 + executed_return)
             peak_value = max(peak_value, portfolio_value)
-            current_drawdown = (portfolio_value - peak_value) / peak_value
-            if current_drawdown < max_drawdown:
-                max_drawdown = current_drawdown
+            current_drawdown = (peak_value - portfolio_value) / peak_value
+            max_drawdown = max(max_drawdown, current_drawdown)
             
             returns.append(executed_return)
-            current_position = target_position
         
         if len(returns) < 2:
             logger.warning("Insufficient returns for OOS validation")
@@ -111,14 +110,14 @@ def get_real_oos_metrics(strategy_fn):
         sharpe = ann_ret / ann_vol if ann_vol > 0 else 0
         
         # FIXED: Correct persistence calculation (monthly basis)
-        monthly_returns = pd.Series(returns, index=test.index[1:]).resample('M').prod()
+        monthly_returns = pd.Series(returns, index=test.index[1:]).resample('M').apply(lambda x: (1+x).prod()-1)
         positive_months = (monthly_returns > 0).sum()
         persistence = positive_months / len(monthly_returns) if len(monthly_returns) > 0 else 0
         
         return {
             'sharpe': sharpe,
             'persistence': persistence,
-            'max_drawdown': abs(max_drawdown),
+            'max_drawdown': max_drawdown,
             'period': f'{split_date.date()}_to_{test.index[-1].date()}'
         }
     except Exception as e:
