@@ -1,6 +1,7 @@
 import streamlit as st
 from core.liquidity_teleporter import optimal_execution_trajectory
 import plotly.graph_objects as go
+import numpy as np
 
 st.markdown("""
 <style>
@@ -81,6 +82,32 @@ body {
 @keyframes rotate {
     100% { transform: rotate(360deg); }
 }
+
+/* NEW IMPACT METRICS */
+.impact-metric {
+    background: rgba(10,5,30,0.95);
+    border: 1px solid rgba(0,243,255,0.5);
+    border-radius: 12px;
+    padding: 1rem;
+    margin: 0.5rem;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+.impact-metric:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 40px rgba(0,243,255,0.3);
+}
+.impact-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    background: linear-gradient(90deg, #00ff9f, #00b8ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.impact-label {
+    font-size: 0.9rem;
+    color: #00f3ff;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -104,6 +131,8 @@ with st.container():
 if st.button("Teleport Position – Zero Footprint Execution", type="primary"):
     with st.spinner("Running quantum-hybrid trajectory optimisation..."):
         traj, impact_bp = optimal_execution_trajectory(adv, position)
+        
+        # REAL-TIME EXECUTION VISUALIZATION
         fig = go.Figure()
         fig.add_trace(go.Scatter(
             y=traj, 
@@ -112,17 +141,61 @@ if st.button("Teleport Position – Zero Footprint Execution", type="primary"):
             line=dict(color='#00ff9f', width=3),
             marker=dict(size=8, color='#ff00ff')
         ))
+        
+        # Add cumulative position line
+        cumulative = np.cumsum(traj)
+        fig.add_trace(go.Scatter(
+            y=cumulative,
+            mode='lines',
+            name='Cumulative Position',
+            line=dict(color='#6a00ff', width=2, dash='dot'),
+            yaxis='y2'
+        ))
+        
         fig.update_layout(
             title="Quantum-Optimized Execution Path",
             xaxis_title="Time Step",
             yaxis_title="Trade Size",
+            yaxis2=dict(
+                title="Cumulative Position",
+                overlaying='y',
+                side='right'
+            ),
             plot_bgcolor='rgba(0,0,0,0)',
             paper_bgcolor='rgba(0,0,0,0)',
             font=dict(color='#ffffff'),
-            hoverlabel=dict(bgcolor='#0f0f2e')
+            hoverlabel=dict(bgcolor='#0f0f2e'),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
         )
         st.plotly_chart(fig, use_container_width=True)
-        st.metric("Total Predicted Impact", f"{impact_bp} bp", "vs 92 bp naive execution")
+        
+        # IMPACT METRICS DASHBOARD
+        st.subheader("Execution Impact Analysis")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.markdown(f"""
+            <div class="impact-metric">
+                <div class="impact-value">{impact_bp} bp</div>
+                <div class="impact-label">TOTAL IMPACT</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        with col2:
+            st.markdown(f"""
+            <div class="impact-metric">
+                <div class="impact-value">{round(92 - impact_bp, 1)} bp</div>
+                <div class="impact-label">VS NAIVE EXECUTION</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        with col3:
+            st.markdown(f"""
+            <div class="impact-metric">
+                <div class="impact-value">{round(position / adv * 100, 2)}%</div>
+                <div class="impact-label">OF ADV</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
         st.success("**Insane value:** Lets a $100B+ fund trade like a $10B fund with zero footprint. Massive increase in capacity + new alpha from flow capture. Easily $2-5B+ annual edge on execution alone for large players.")
 
 st.info("These aren't sci-fi — the building blocks all exist in 2026 at research scale. Integrating them with proprietary data moats is the moat.")

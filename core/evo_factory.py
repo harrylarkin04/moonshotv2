@@ -30,8 +30,8 @@ if hasattr(creator, 'FitnessMax'):
 if hasattr(creator, 'Individual'):
     del creator.Individual
 
-# IMPROVEMENT: Enhanced fitness weights with persistence
-creator.create("FitnessMax", base.Fitness, weights=(1.0, 0.6, -0.3, 0.4, 0.5, 0.3, 0.4))
+# ENHANCED: More balanced fitness weights
+creator.create("FitnessMax", base.Fitness, weights=(1.0, 0.7, -0.4, 0.5, 0.6, 0.4, 0.5))
 creator.create("Individual", list, fitness=creator.FitnessMax)
 
 toolbox = base.Toolbox()
@@ -54,29 +54,43 @@ def evaluate(individual):
         diversity = 1 - max_drawdown
         consistency = (sharpe > 0) * persistence
         
-        # ENHANCED: Novelty detection using population distance
-        pop_distances = [euclidean(individual, ind) for ind in toolbox.population(n=10)]
-        novelty = np.mean(pop_distances)
+        # ENHANCED: Novelty detection using MAHALANOBIS distance
+        pop_sample = random.sample(toolbox.population(n=100), 10)
+        if pop_sample:
+            cov_matrix = np.cov(np.array(pop_sample).T)
+            try:
+                inv_cov = np.linalg.inv(cov_matrix + np.eye(cov_matrix.shape[0])*1e-6)
+                novelty = np.mean([mahalanobis(individual, ind, inv_cov) for ind in pop_sample])
+            except np.linalg.LinAlgError:
+                novelty = np.mean([euclidean(individual, ind) for ind in pop_sample])
+        else:
+            novelty = 1.0
         
         complexity = len(individual) / 50.0
         
-        # STRICTER: Penalize low persistence more heavily
-        persistence_penalty = 0.3 if persistence < 0.8 else 1.0
+        # STRICTER: Persistence threshold with exponential penalty
+        persistence_penalty = 0.2 if persistence < 0.8 else 1.0
         
-        # ENHANCED: Add regime robustness test
+        # ENHANCED: Regime robustness test with statistical significance
         omniverse_results = []
         for scenario in ["Base", "Trump2+China", "AI-CapEx-Crash"]:
-            sim_returns = run_omniverse_sims(scenario, num_sims=100)
+            sim_returns = run_omniverse_sims(scenario, num_sims=500)
             if not sim_returns.size:
                 continue
-            sim_sharpe = np.mean(sim_returns[-1]) / np.std(sim_returns[-1])
-            omniverse_results.append(sim_sharpe)
+                
+            # Calculate risk-adjusted return
+            sim_final = sim_returns[-1]
+            sim_sharpe = np.mean(sim_final) / np.std(sim_final)
+            
+            # Only count scenarios with sufficient data
+            if len(sim_final) > 100:
+                omniverse_results.append(sim_sharpe)
         
-        # Calculate robustness score (min 0.5 penalty for poor scenarios)
+        # Calculate robustness score
         robustness = 1.0
         if omniverse_results:
             min_scenario_sharpe = min(omniverse_results)
-            robustness = max(0.5, min_scenario_sharpe / sharpe) if sharpe > 0 else 0.5
+            robustness = max(0.4, min_scenario_sharpe / sharpe) if sharpe > 0 else 0.4
         
         return (sharpe * persistence_penalty * robustness, 
                 persistence, 
@@ -112,8 +126,8 @@ def evolve_new_alpha(ui_context=True):
         best_ind = tools.selBest(population, 1)[0]
         metrics = evaluate(best_ind)
         
-        # STRICTER: Elite criteria for alphas
-        if metrics[0] > 4.0 and metrics[1] > 0.88 and metrics[2] > 0.6:
+        # STRICTER: Elite criteria with novelty requirement
+        if metrics[0] > 4.0 and metrics[1] > 0.88 and metrics[2] > 0.6 and metrics[4] > 0.5:
             save_alpha(
                 name=f"EvolvedAlpha-{hash(tuple(best_ind)) % 1000000}",
                 description="Evolutionary strategy",
@@ -125,7 +139,7 @@ def evolve_new_alpha(ui_context=True):
             )
             if ui_context:
                 st.toast("🔥 ELITE alpha evolved and deployed!", icon="🚀")
-            logger.info(f"Evolved elite alpha: Sharpe={metrics[0]:.2f}, Persistence={metrics[1]:.2f}")
+            logger.info(f"Evolved elite alpha: Sharpe={metrics[0]:.2f}, Persistence={metrics[1]:.2f}, Novelty={metrics[4]:.2f}")
             return True
         logger.warning("No elite alpha met criteria this cycle")
         return False

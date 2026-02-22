@@ -72,7 +72,17 @@ def get_real_oos_metrics(strategy_fn):
         returns_list = []
         position = 0.0
         
-        # Enhanced slippage model with volume clustering
+        # ENHANCED: Volume clustering detection
+        volume_clusters = {}
+        if test_volumes is not None:
+            for asset in test_volumes.columns:
+                # Use K-means to identify volume regimes
+                from sklearn.cluster import KMeans
+                vol_data = test_volumes[asset].values.reshape(-1, 1)
+                kmeans = KMeans(n_clusters=3, random_state=0).fit(vol_data)
+                volume_clusters[asset] = kmeans.labels_
+        
+        # Enhanced slippage model with volume percentiles
         for i in range(1, len(test)):
             current_returns = test.iloc[i]
             prev_returns = test.iloc[i-1]
@@ -81,14 +91,24 @@ def get_real_oos_metrics(strategy_fn):
             target_position = signal * portfolio_value
             trade = target_position - position
             
-            # Dynamic slippage based on volume percentiles and trade size
+            # DYNAMIC SLIPPAGE MODEL
+            slippage_bp = 10  # Base slippage
+            
             if test_volumes is not None and not test_volumes.empty:
+                # Volume-based adjustment
                 volume_percentile = test_volumes.iloc[i].rank(pct=True).mean()
                 liquidity_adj = 1 - volume_percentile
+                
+                # Trade size impact
                 trade_size_ratio = abs(trade) / (test_volumes.iloc[i].mean() + 1e-6)
-                slippage_bp = 5 + 25 * liquidity_adj + 15 * trade_size_ratio
-            else:
-                slippage_bp = 10 + 20 * (abs(trade)/1e6)
+                
+                # Volume cluster impact (if available)
+                cluster_adj = 0
+                if volume_clusters:
+                    cluster_vals = [volume_clusters[asset][i] for asset in test_volumes.columns]
+                    cluster_adj = np.mean(cluster_vals) / 2  # 0-1 scale adjustment
+                
+                slippage_bp = 5 + 25 * liquidity_adj + 20 * trade_size_ratio + 10 * cluster_adj
             
             slippage = slippage_bp / 10000 * abs(trade)
             position = target_position
