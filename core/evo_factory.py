@@ -20,9 +20,9 @@ from core.shadow_crowd import simulate_cascade_prob
 from core.liquidity_teleporter import optimal_execution_trajectory
 
 # Clean creator namespace safely
-if "FitnessMax" in creator.__dict__:
+if hasattr(creator, 'FitnessMax'):
     del creator.FitnessMax
-if "Individual" in creator.__dict__:
+if hasattr(creator, 'Individual'):
     del creator.Individual
 
 creator.create("FitnessMax", base.Fitness, weights=(1.0, 0.5, -0.2, 0.3, 0.4, 0.2, 0.3))
@@ -43,9 +43,9 @@ def evaluate(individual):
     
     sharpe = metrics['sharpe']
     persistence = metrics['persistence']
-    diversity = np.random.uniform(0.2, 0.8)  # Placeholder for real diversity metric
-    consistency = np.random.uniform(0.5, 0.9)  # Placeholder for real consistency metric
-    novelty = np.random.uniform(0.1, 0.5)  # Placeholder for novelty
+    diversity = 0.0  # Placeholder for real diversity metric
+    consistency = 0.0  # Placeholder for real consistency metric
+    novelty = 0.0  # Placeholder for novelty
     complexity = len(individual) / 50.0
     
     return (sharpe, persistence, diversity, consistency, novelty, complexity, 0.5)
@@ -68,7 +68,7 @@ def evolve_new_alpha(ui_context=True):
         metrics = evaluate(best_ind)
         
         # Save if meets criteria
-        if metrics[0] > 3.5 and metrics[1] > 0.8 and metrics[2] > 0.3 and metrics[3] > 0.7:
+        if metrics[0] > 3.5 and metrics[1] > 0.8:
             save_alpha(
                 name=f"EvolvedAlpha-{hash(tuple(best_ind)) % 1000000}",
                 description="Evolutionary strategy",

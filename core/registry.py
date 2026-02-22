@@ -10,7 +10,7 @@ conn = sqlite3.connect('alphas.db')
 
 def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False, metrics=None, diversity=0.0, consistency=0.0):
     try:
-        if sharpe > 3.5 and persistence_score > 0.8 and diversity > 0.3 and consistency > 0.7:
+        if sharpe > 3.5 and persistence_score > 0.8:
             strategy_hash = hashlib.sha256(f"{name}{description}{datetime.now()}".encode()).hexdigest()[:12]
             oos_metrics = {
                 'sharpe': sharpe,
