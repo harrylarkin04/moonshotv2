@@ -30,7 +30,7 @@ def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False, 
             
             with conn:
                 conn.execute("""
-                    INSERT INTO alphas 
+                    INSERT OR REPLACE INTO alphas 
                     (name, description, sharpe, persistence_score, created, live_paper_trading, oos_metrics, diversity, consistency) 
                     VALUES (?,?,?,?,?,?,?,?,?)
                 """, (name, description, sharpe, persistence_score, datetime.now().isoformat(), 
@@ -47,9 +47,9 @@ def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False, 
 def get_real_oos_metrics(strategy_fn):
     """Enhanced walk-forward validation with dynamic volume/slippage model"""
     try:
-        full_data, _, volumes = get_multi_asset_data(period="max", include_volume=True)
+        adj_close, returns, volumes = get_multi_asset_data(period="max", include_volume=True)
         
-        if full_data.empty:
+        if returns.empty:
             logger.error("No data available for OOS validation")
             return {
                 'sharpe': 0,
@@ -59,31 +59,30 @@ def get_real_oos_metrics(strategy_fn):
             }
         
         # Dynamic train/test split based on volatility regimes
-        train_ratio = 0.7 if len(full_data) > 1000 else 0.6
-        split_idx = int(len(full_data)*train_ratio)
+        train_ratio = 0.7 if len(returns) > 1000 else 0.6
+        split_idx = int(len(returns)*train_ratio)
         
-        train = full_data.iloc[:split_idx]
-        test = full_data.iloc[split_idx:]
+        train = returns.iloc[:split_idx]
+        test = returns.iloc[split_idx:]
         test_volumes = volumes.iloc[split_idx:] if volumes is not None else None
         
         portfolio_value = 1.0
         peak_value = 1.0
         max_drawdown = 0.0
-        returns = []
+        returns_list = []
         position = 0.0
         
         # Enhanced slippage model with volume clustering
         for i in range(1, len(test)):
-            current_prices = test.iloc[i]
-            prev_prices = test.iloc[i-1]
+            current_returns = test.iloc[i]
+            prev_returns = test.iloc[i-1]
             
-            asset_returns = (current_prices / prev_prices - 1).values
-            signal = strategy_fn(prev_prices)
+            signal = strategy_fn(prev_returns)
             target_position = signal * portfolio_value
             trade = target_position - position
             
             # Dynamic slippage based on volume percentiles and trade size
-            if test_volumes is not None:
+            if test_volumes is not None and not test_volumes.empty:
                 volume_percentile = test_volumes.iloc[i].rank(pct=True).mean()
                 liquidity_adj = 1 - volume_percentile
                 trade_size_ratio = abs(trade) / (test_volumes.iloc[i].mean() + 1e-6)
@@ -93,15 +92,15 @@ def get_real_oos_metrics(strategy_fn):
             
             slippage = slippage_bp / 10000 * abs(trade)
             position = target_position
-            portfolio_return = np.dot(asset_returns, position) - slippage
+            portfolio_return = np.dot(current_returns, position) - slippage
             portfolio_value *= (1 + portfolio_return)
             
             peak_value = max(peak_value, portfolio_value)
             current_dd = (peak_value - portfolio_value) / peak_value
             max_drawdown = max(max_drawdown, current_dd)
-            returns.append(portfolio_return)
+            returns_list.append(portfolio_return)
         
-        returns_series = pd.Series(returns)
+        returns_series = pd.Series(returns_list)
         if len(returns_series) < 3:
             return {
                 'sharpe': 0,
