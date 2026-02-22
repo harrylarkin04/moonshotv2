@@ -33,10 +33,26 @@ df = pd.DataFrame(results)
 st.dataframe(df[['name', 'sharpe', 'persistence', 'oos_return', 'max_drawdown']], use_container_width=True)
 
 st.subheader("Combined Portfolio Equity Curve (Real OOS)")
-portfolio = sum(r['equity_curve'] for r in results) / len(results)
-fig = px.line(x=portfolio.index, y=portfolio, title="Portfolio Equity Curve")
+
+# ---------------- FIX STARTS HERE ----------------
+equity_curves = [pd.Series(r['equity_curve']) for r in results]
+
+# Align all curves by index before averaging
+portfolio = pd.concat(equity_curves, axis=1).mean(axis=1)
+
+# Ensure 1D Series for Plotly
+portfolio = portfolio.squeeze()
+# ---------------- FIX ENDS HERE ----------------
+
+fig = px.line(
+    x=portfolio.index,
+    y=portfolio,
+    title="Portfolio Equity Curve"
+)
+
 fig.update_traces(line_color='#00ffff', line_width=4)
 fig.update_layout(template="plotly_dark")
+
 st.plotly_chart(fig, use_container_width=True)
 
 st.caption("Performance is real out-of-sample backtested on historical data (yfinance).")
