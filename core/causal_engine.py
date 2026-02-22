@@ -95,26 +95,49 @@ Output only one hypothesis per line, starting with "Agent X: "."""
     cache_hypotheses(assets, result)
     return result
 
-# Your other functions
 def build_causal_dag(returns):
     G = nx.DiGraph()
     for col in returns.columns:
-        G.add_node(col)
+        G.add_node(col, metrics={'persistence': 0.0, 'influence': 0.0})
+    
+    edge_metrics = []
     for i, cause in enumerate(returns.columns):
         for effect in returns.columns[i+1:]:
             try:
                 from statsmodels.tsa.stattools import grangercausalitytests
                 gc = grangercausalitytests(returns[[cause, effect]], 5, verbose=False)
                 pvals = [gc[l+1][0]['ssr_ftest'][1] for l in range(5)]
-                if min(pvals) < 0.05:
-                    G.add_edge(cause, effect, weight=1 - min(pvals))
+                min_pval = min(pvals)
+                if min_pval < 0.05:
+                    weight = 1 - min_pval
+                    G.add_edge(cause, effect, weight=weight)
+                    edge_metrics.append(weight)
+                    
+                    # Update node metrics
+                    G.nodes[effect]['metrics']['persistence'] = max(G.nodes[effect]['metrics']['persistence'], weight)
+                    G.nodes[effect]['metrics']['influence'] += weight
             except:
                 pass
+    
+    # Normalize influence scores
+    if edge_metrics:
+        max_influence = max([G.nodes[n]['metrics']['influence'] for n in G.nodes])
+        for node in G.nodes:
+            if max_influence > 0:
+                G.nodes[node]['metrics']['influence'] /= max_influence
     return G
 
 def visualize_dag(G):
     net = Network(height="680px", width="100%", directed=True, bgcolor="#05050f", font_color="#ffffff")
-    net.from_nx(G)
+    for node in G.nodes:
+        metrics = G.nodes[node].get('metrics', {})
+        net.add_node(node, 
+                     title=f"Persistence: {metrics.get('persistence', 0.0):.2f}\nInfluence: {metrics.get('influence', 0.0):.2f}",
+                     physics=True)
+    
+    for edge in G.edges(data=True):
+        net.add_edge(edge[0], edge[1], value=edge[2].get('weight', 0.5))
+    
     net.save_graph("dag.html")
     with open("dag.html", "r", encoding="utf-8") as f:
         components.html(f.read(), height=680)

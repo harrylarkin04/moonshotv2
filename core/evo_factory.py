@@ -37,7 +37,7 @@ if "Individual" in creator.__dict__:
     del creator.Individual
 
 # Enhanced fitness with novelty objective
-creator.create("FitnessMax", base.Fitness, weights=(1.0, 0.5, -0.2, 0.3, 0.4, 0.2))  # Added counterfactual weight
+creator.create("FitnessMax", base.Fitness, weights=(1.0, 0.5, -0.2, 0.3, 0.4, 0.2, 0.3))  # Added persistence weight
 creator.create("Individual", list, fitness=creator.FitnessMax)
 
 toolbox = base.Toolbox()
@@ -284,14 +284,19 @@ def evaluate(individual):
         nn_sharpe = nn.predict(X)[0]
         
         if abs(is_metrics['sharpe'] - nn_sharpe) > 0.5:
-            return 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+            return 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
         
         # Full pipeline validation
-        if not swarm_generate_hypotheses(is_returns):
-            return 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        hypotheses = swarm_generate_hypotheses(is_returns)
+        if not hypotheses:
+            return 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
         
         G = build_causal_dag(is_returns)
         causal_score = len(G.edges) / 100
+        
+        # Calculate persistence score from causal graph
+        persistence_scores = [G.nodes[n]['metrics']['persistence'] for n in G.nodes]
+        persistence_score = np.mean(persistence_scores) if persistence_scores else 0.0
         
         omniverse_score = run_omniverse_sims(scenario="Stress", num_sims=5000)
         crowd_risk = simulate_cascade_prob()
@@ -304,20 +309,22 @@ def evaluate(individual):
         
         # Composite fitness score with quantum entanglement
         fitness = (
-            oos_metrics['sharpe'] * 0.4 + 
+            oos_metrics['sharpe'] * 0.35 + 
             oos_metrics['sortino'] * 0.15 +
             (1 - abs(oos_metrics['max_drawdown'])) * 0.15 +
             omniverse_score * 0.1 +
             (1 - crowd_risk) * 0.05 -
             overfit_penalty +
             oos_metrics['consistency'] * 0.1 +
-            resilience_score * 0.2
+            resilience_score * 0.2 +
+            persistence_score * 0.3  # Added persistence to fitness
         )
         
         individual.metrics = {
             'in_sample': is_metrics,
             'out_of_sample': oos_metrics,
             'causal_score': causal_score,
+            'persistence_score': persistence_score,
             'omniverse_score': omniverse_score,
             'crowd_risk': crowd_risk,
             'overfit_penalty': overfit_penalty,
@@ -326,10 +333,10 @@ def evaluate(individual):
             'resilience_score': resilience_score
         }
         
-        return fitness, oos_metrics['consistency'], causal_score, oos_metrics['sortino'], 0.0, resilience_score
+        return fitness, oos_metrics['consistency'], causal_score, oos_metrics['sortino'], 0.0, resilience_score, persistence_score
     except Exception as e:
         logger.error(f"Evaluation failed: {e}")
-        return 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        return 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
 
 def init_toolbox():
     """Initialize with quantum novelty preservation"""
@@ -368,7 +375,7 @@ def init_toolbox():
         mutation_prob *= generation_factor
         
         # Use diversity to adjust mutation strength
-        sigma = 0.1 * (1.0 - min(diversity, 0.8)) + 0.01
+        sigma = 0.1ాలు * (1.0 - min(diversity, 0.8)) + 0.01
         return tools.mutGaussian(individual, mu=0, sigma=sigma, indpb=mutation_prob)
     
     toolbox.register("mutate", adaptive_mutate)
@@ -394,8 +401,8 @@ def parallel_evaluate(population):
             NOVELTY_ARCHIVE.append(BEHAVIOR_CHARACTERIZATION[id(ind)])
     
     # Combine results with novelty
-    for ind, (fit, consistency, causal, sortino, _, resilience) in zip(population, results):
-        ind.fitness.values = (fit, consistency, causal, sortino, ind.fitness.novelty, resilience)
+    for ind, (fit, consistency, causal, sortino, _, resilience, persistence) in zip(population, results):
+        ind.fitness.values = (fit, consistency, causal, sortino, ind.fitness.novelty, resilience, persistence)
     return population
 
 def evolve_new_alpha(ui_context=False):
@@ -421,13 +428,15 @@ def evolve_new_alpha(ui_context=False):
             hologram_placeholder = st.empty()
             novelty_placeholder = st.empty()
             resilience_placeholder = st.empty()
-            entanglement_placeholder = st.empty()  # New entanglement visualization
+            persistence_placeholder = st.empty()  # New persistence visualization
+            entanglement_placeholder = st.empty()
             
             with st.sidebar.expander("⚡ QUANTUM EVOLUTION CONTROLS"):
                 st.session_state.quantum_temp = st.slider("Quantum Temperature", 0.1, 1.0, 0.3, 0.05)
                 st.session_state.diversity_threshold = st.slider("Diversity Threshold", 0.1, 0.9, 0.4, 0.05)
                 st.session_state.novelty_weight = st.slider("Novelty Weight", 0.1, 1.0, 0.4, 0.05)
                 st.session_state.resilience_weight = st.slider("Resilience Weight", 0.1, 1.0, 0.2, 0.05)
+                st.session_state.persistence_weight = st.slider("Persistence Weight", 0.1, 1.0, 0.3, 0.05)
                 st.session_state.neural_validation = st.checkbox("Neural Validation Gate", True)
                 st.session_state.fold_count = st.slider("Validation Folds", 3, 10, 5, 1)
                 st.session_state.pop_size = st.slider("Population Size", 500, 2000, 1200, 100)
@@ -449,8 +458,9 @@ def evolve_new_alpha(ui_context=False):
         diversity_history = []
         novelty_history = []
         resilience_history = []
+        persistence_history = []
         best_fitness_history = []
-        entanglement_history = []  # Track entanglement strength
+        entanglement_history = []
         stagnation_counter = 0
         prev_best = -np.inf
         
@@ -467,6 +477,7 @@ def evolve_new_alpha(ui_context=False):
             diversity_history.append(diversity)
             novelty_history.append(np.mean([ind.fitness.values[4] for ind in pop]))
             resilience_history.append(np.mean([ind.fitness.values[5] for ind in pop]))
+            persistence_history.append(np.mean([ind.fitness.values[6] for ind in pop]))
             
             record = stats.compile(pop)
             current_best = record['max']
@@ -490,6 +501,7 @@ def evolve_new_alpha(ui_context=False):
                 "diversity": diversity,
                 "novelty": np.mean([ind.fitness.novelty for ind in pop]),
                 "resilience": np.mean([ind.fitness.values[5] for ind in pop]),
+                "persistence": np.mean([ind.fitness.values[6] for ind in pop]),
                 "projection": projection,
                 "behaviors": behaviors,
                 "top_individuals": [ind[:] for ind in tools.selBest(pop, 5)]
@@ -503,6 +515,7 @@ def evolve_new_alpha(ui_context=False):
                 Diversity: `{diversity:.4f}` 🌐  
                 Novelty: `{gen_data['novelty']:.4f}` 🌀  
                 Resilience: `{gen_data['resilience']:.4f}` 🛡️  
+                Persistence: `{gen_data['persistence']:.4f}` ⚓  
                 Stagnation: `{stagnation_counter}/3` ⏳  
                 Elites: `{elite_counter}` 🚀
                 """)
@@ -518,7 +531,7 @@ def evolve_new_alpha(ui_context=False):
                             mode='markers',
                             marker=dict(
                                 size=6,
-                                color=[ind.fitness.values[5] for ind in pop],  # Resilience-based coloring
+                                color=[ind.fitness.values[6] for ind in pop],  # Persistence-based coloring
                                 colorscale='Portland',
                                 opacity=0.9,
                                 line=dict(width=1, color='#00f3ff')
@@ -545,7 +558,7 @@ def evolve_new_alpha(ui_context=False):
                         scene=dict(
                             xaxis_title='Entanglement Axis 1',
                             yaxis_title='Entanglement Axis 2',
-                            zaxis_title='Resilience Axis'
+                            zaxis_title='Persistence Axis'
                         )
                     )
                     hologram_placeholder.plotly_chart(fig, use_container_width=True)
@@ -580,10 +593,28 @@ def evolve_new_alpha(ui_context=False):
                     ))
                     fig.update_layout(
                         title="RESILIENCE EVOLUTION",
+                        template='plotly_dark',height=300,
+                        xaxis_title='Generation',
+                        yaxis_title='Resilience',
+                        margin=dict(l=20, r=20, t=50, b=20)
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                # Persistence visualization
+                with persistence_placeholder.container():
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(
+                        x=gens, y=persistence_history,
+                        mode='lines+markers',
+                        line=dict(color='#00f3ff', width=3),
+                        name='Persistence Score'
+                    ))
+                    fig.update_layout(
+                        title="PERSISTENCE EVOLUTION",
                         template='plotly_dark',
                         height=300,
                         xaxis_title='Generation',
-                        yaxis_title='Resilience',
+                        yaxis_title='Persistence',
                         margin=dict(l=20, r=20, t=50, b=20)
                     )
                     st.plotly_chart(fig, use_container_width=True)
@@ -645,7 +676,8 @@ def evolve_new_alpha(ui_context=False):
                     diversity > st.session_state.diversity_threshold and
                     metrics.get('consistency', 0) > 0.7 and
                     best.fitness.values[4] > NOVELTY_DYNAMIC_THRESHOLD and
-                    best.fitness.values[5] > 0.7):  # Added resilience threshold
+                    best.fitness.values[5] > 0.7 and
+                    best.fitness.values[6] > 0.7):  # Added persistence threshold
                     
                     name = f"QuantumAlpha_{random.randint(10000,99999)}"
                     desc = f"{current_hypothesis} – evolved through Quantum Evo v8"
@@ -658,7 +690,8 @@ def evolve_new_alpha(ui_context=False):
                         metrics=json.dumps(metrics),
                         diversity=diversity,
                         novelty=best.fitness.values[4],
-                        resilience=best.fitness.values[5]
+                        resilience=best.fitness.values[5],
+                        persistence=best.fitness.values[6]
                     ):
                         elite_counter += 1
                         if ui_context:

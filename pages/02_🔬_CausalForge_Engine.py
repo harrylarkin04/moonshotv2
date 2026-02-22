@@ -107,8 +107,7 @@ if st.button("🧠 Activate Autonomous LLM Swarm (5 agents)", type="primary"):
 if st.button("🔬 Build & Visualize Neural Causal DAG"):
     with st.spinner("Running next-gen causal discovery..."):
         G = build_causal_dag(returns)
-        fig = visualize_dag(G)
-        st.plotly_chart(fig, use_container_width=True)
+        visualize_dag(G)
         st.session_state.causal_dag = G  # Store for interaction
         st.success("Fully explainable causal DAG generated + persistence scores attached.")
 
@@ -119,17 +118,16 @@ if 'causal_dag' in st.session_state and st.session_state.causal_dag:
     selected_node = st.selectbox("Select node for details", nodes, index=0)
     
     # Display node information
-    if st.session_state.causal_dag.nodes[selected_node].get('metrics'):
-        metrics = st.session_state.causal_dag.nodes[selected_node]['metrics']
-        st.markdown(f"""
-        <div class="node-info-panel">
-            <h3>📈 {selected_node}</h3>
-            <p><strong>Persistence Score:</strong> {metrics.get('persistence', 0.94):.2f}</p>
-            <p><strong>Causal Influence:</strong> {metrics.get('influence', 0.87):.2f}</p>
-            <p><strong>Regime Robustness:</strong> {metrics.get('robustness', 0.92):.2f}</p>
-            <p><strong>Last Shock:</strong> {metrics.get('last_shock', '+1.2%')}</p>
-        </div>
-        """, unsafe_allow_html=True)
+    node_metrics = st.session_state.causal_dag.nodes[selected_node].get('metrics', {})
+    st.markdown(f"""
+    <div class="node-info-panel">
+        <h3>📈 {selected_node}</h3>
+        <p><strong>Persistence Score:</strong> {node_metrics.get('persistence', 0.0):.2f}</p>
+        <p><strong>Causal Influence:</strong> {node_metrics.get('influence', 0.0):.2f}</p>
+        <p><strong>Regime Robustness:</strong> {node_metrics.get('robustness', 0.92):.2f}</p>
+        <p><strong>Last Shock:</strong> {node_metrics.get('last_shock', '+1.2%')}</p>
+    </div>
+    """, unsafe_allow_html=True)
 
 st.subheader("Interventional / Counterfactual Simulator")
 assets = returns.columns.tolist()
