@@ -2,12 +2,16 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 from core.data_fetcher import get_multi_asset_data
+import logging
+
+logger = logging.getLogger('omniverse')
 
 def run_omniverse_sims(scenario="Base", num_sims=8000):
     """Run market simulations under different scenarios with asset correlations"""
     try:
         _, returns = get_multi_asset_data(period="2y")
         if returns.empty:
+            logger.error("No returns data available")
             return pd.DataFrame()
         
         # Calculate mean and covariance from historical returns
@@ -34,5 +38,5 @@ def run_omniverse_sims(scenario="Base", num_sims=8000):
         market_cumulative = np.cumprod(1 + market_returns, axis=1)
         return market_cumulative
     except Exception as e:
-        print(f"Error in omniverse simulation: {e}")
+        logger.error(f"Error in omniverse simulation: {e}")
         return pd.DataFrame()

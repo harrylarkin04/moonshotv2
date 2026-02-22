@@ -58,17 +58,18 @@ body {
     transform: scale(1.05);
 }
 
-.node-info-panel {
-    background: rgba(10,5,30,0.95);
+/* NEW HOLOGRAPHIC PANELS */
+.holographic {
+    background: linear-gradient(125deg, rgba(0,243,255,0.1), rgba(255,0,255,0.1));
     border: 1px solid rgba(0,243,255,0.5);
     border-radius: 16px;
     padding: 1.5rem;
-    margin-top: 1rem;
+    margin-bottom: 1.5rem;
     box-shadow: 0 0 50px rgba(0,243,255,0.2);
     position: relative;
     overflow: hidden;
 }
-.node-info-panel::before {
+.holographic::before {
     content: '';
     position: absolute;
     top: -50%;
@@ -81,6 +82,32 @@ body {
 }
 @keyframes rotate {
     100% { transform: rotate(360deg); }
+}
+
+/* NODE METRICS */
+.metric-card {
+    background: rgba(10,5,30,0.95);
+    border: 1px solid rgba(0,243,255,0.5);
+    border-radius: 12px;
+    padding: 1rem;
+    margin: 0.5rem;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+.metric-card:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 40px rgba(0,243,255,0.3);
+}
+.metric-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    background: linear-gradient(90deg, #00ff9f, #00b8ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.metric-label {
+    font-size: 0.9rem;
+    color: #00f3ff;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -117,19 +144,28 @@ if 'causal_dag' in st.session_state and st.session_state.causal_dag:
     nodes = list(st.session_state.causal_dag.nodes())
     selected_node = st.selectbox("Select node for details", nodes, index=0)
     
-    # Display node metrics
-    node_metrics = st.session_state.causal_dag.nodes[selected_node].get('metrics', {})
-    st.markdown(f"""
-    <div class="node-info-panel">
-        <h3>📈 {selected_node}</h3>
-        <p><strong>Persistence Score:</strong> {node_metrics.get('persistence', 0.0):.2f}</p>
-        <p><strong>Causal Influence:</strong> {node_metrics.get('influence', 0.0):.2f}</p>
-        <p><strong>Regime Robustness:</strong> {node_metrics.get('robustness', 0.92):.2f}</p>
-        <p><strong>Last Shock:</strong> {node_metrics.get('last_shock', '+1.2%')}</p>
-    </div>
-    """, unsafe_allow_html=True)
+    # Display node metrics in holographic cards
+    node_data = st.session_state.causal_dag.nodes[selected_node]
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-value">{node_data.get('persistence', 0.0):.2f}</div>
+            <div class="metric-label">PERSISTENCE SCORE</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-value">{node_data.get('influence', 0.0):.2f}</div>
+            <div class="metric-label">CAUSAL INFLUENCE</div>
+        </div>
+        """, unsafe_allow_html=True)
 
 st.subheader("Interventional / Counterfactual Simulator")
+st.markdown('<div class="holographic">', unsafe_allow_html=True)
 assets = returns.columns.tolist()
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -138,6 +174,7 @@ with col2:
     shock_size = st.slider("Shock size (% daily return)", -15.0, 15.0, 3.0)
 with col3:
     horizon = st.slider("Simulation horizon (days)", 30, 365, 120)
+st.markdown('</div>', unsafe_allow_html=True)
 
 if st.button("Run What-If Simulation"):
     sim = counterfactual_sim(returns, shock_asset, shock_size/100, steps=horizon)
