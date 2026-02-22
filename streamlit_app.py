@@ -156,6 +156,21 @@ input:-webkit-autofill:active {
 .glitch {
     animation: glitch 0.5s infinite;
 }
+
+/* NEURAL NETWORK TRANSITION */
+@keyframes neural {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+.neural-transition {
+    background: linear-gradient(270deg, #00ff9f, #00b8ff, #ff00ff, #6a00ff);
+    background-size: 400% 400%;
+    animation: neural 8s ease infinite;
+    height: 4px;
+    border: none;
+    margin: 1rem 0;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -212,8 +227,10 @@ else:
             if st.button(name, use_container_width=True, type="primary", key=name):
                 st.switch_page(page)
 
+    # Neural network transition effect
+    st.markdown('<div class="neural-transition"></div>', unsafe_allow_html=True)
+
     # NEW LIVE TRADING SECTION
-    st.markdown("---")
     st.subheader("🚀 LIVE PAPER-TRADING SIMULATION")
     st.markdown("""
     <div class="holographic">
@@ -231,10 +248,12 @@ else:
         st.metric("Max Drawdown", "-1.7%", "0.3%↓")
     
     # AUTO-DEPLOYMENT CONTROL CENTER
+    st.markdown('<div class="neural-transition"></div>', unsafe_allow_html=True)
+    st.subheader("CLOSED-LOOP EVOLUTION ENGINE")
     st.markdown("""
     <div class="holographic">
-        <h3 style="color:#00f3ff; text-align:center">CLOSED-LOOP EVOLUTION ENGINE</h3>
-        <p style="text-align:center">Real-time alpha generation & deployment</p>
+        <h3 style="color:#00f3ff; text-align:center">REAL-TIME ALPHA GENERATION & DEPLOYMENT</h3>
+        <p style="text-align:center">Quantum evolution of non-crowded, persistent alphas</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -246,10 +265,12 @@ else:
                 st.warning("⚠️ No elite strategies met criteria this cycle")
     
     # ELITE STRATEGY ZOO
+    st.markdown('<div class="neural-transition"></div>', unsafe_allow_html=True)
+    st.subheader("ELITE STRATEGY ZOO")
     st.markdown("""
     <div class="holographic">
-        <h3 style="color:#00f3ff; text-align:center">ELITE STRATEGY ZOO</h3>
-        <p style="text-align:center">Top performers in live paper-trading</p>
+        <h3 style="color:#00f3ff; text-align:center">TOP PERFORMERS IN LIVE PAPER-TRADING</h3>
+        <p style="text-align:center">Non-crowded, persistent, and high-capacity alphas</p>
     </div>
     """, unsafe_allow_html=True)
     

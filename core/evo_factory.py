@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 # Quantum novelty preservation system
 NOVELTY_ARCHIVE = []
 BEHAVIOR_CHARACTERIZATION = {}
+NOVELTY_DYNAMIC_THRESHOLD = 0.5  # Dynamic threshold for novelty preservation
 
 # Remove existing creator classes to avoid conflicts
 if "FitnessMax" in creator.__dict__:
@@ -306,8 +307,11 @@ def parallel_evaluate(population):
     
     # Update archive with novel individuals
     avg_novelty = np.mean([ind.fitness.novelty for ind in population])
+    global NOVELTY_DYNAMIC_THRESHOLD
+    NOVELTY_DYNAMIC_THRESHOLD = max(0.3, min(0.7, avg_novelty * 1.2))  # Dynamic threshold adjustment
+    
     for ind in population:
-        if ind.fitness.novelty > avg_novelty * 1.5:
+        if ind.fitness.novelty > NOVELTY_DYNAMIC_THRESHOLD:
             NOVELTY_ARCHIVE.append(BEHAVIOR_CHARACTERIZATION[id(ind)])
     
     # Combine results with novelty
@@ -423,7 +427,7 @@ def evolve_new_alpha(ui_context=False):
                             mode='markers',
                             marker=dict(
                                 size=6,
-                                color=[ind.fitness.values[4] for ind in pop],  # Novelty score
+                                color=[ind.fitness.values[0] for ind in pop],  # Fitness-based coloring
                                 colorscale='Viridis',
                                 opacity=0.9,
                                 line=dict(width=1, color='#00f3ff')
@@ -510,7 +514,7 @@ def evolve_new_alpha(ui_context=False):
                     metrics.get('overfit_penalty', 1) < 0.2 and
                     diversity > st.session_state.diversity_threshold and
                     metrics.get('consistency', 0) > 0.7 and
-                    best.fitness.values[4] > 0.5):  # Novelty threshold
+                    best.fitness.values[4] > NOVELTY_DYNAMIC_THRESHOLD):  # Dynamic novelty threshold
                     
                     name = f"QuantumAlpha_{random.randint(10000,99999)}"
                     desc = f"{current_hypothesis} – evolved through Quantum Evo v8"

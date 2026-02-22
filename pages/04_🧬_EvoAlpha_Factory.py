@@ -10,8 +10,7 @@ st.title("🧬 EVOALPHA FOUNDRY")
 st.markdown("""
 <style>
 @keyframes hologram {
-    0% { box-shadow: 0 0 20px #00f3ff, 0 0 40px #00b8ff; }
-    50% { box-shadow: 0 0 60px #00f3ff, 0 0 100px #00b8ff; }
+    0% { box-shadow: 0 0 20px #00f3ff, 0 0 40px #00b8ff; }50% { box-shadow: 0 0 60px #00f3ff, 0 0 100px #00b8ff; }
     100% { box-shadow: 0 0 20px #00f3ff, 0 0 40px #00b8ff; }
 }
 @keyframes glitch {
@@ -181,8 +180,8 @@ if not top_alphas.empty:
             """, unsafe_allow_html=True)
             
             # Drawdown progress
-            dd_pct = min(abs(row['max_drawdown']) / 0.2, 1.0)  # Fixed: added missing variable definition
-            st.markdown(f"DRAWDOWN: `{row['max_drawdown']*100:.1f}%`")
+            dd_pct = min(abs(row['max_drawdown']) / 0.2, 1.0)
+            st.markdown(f"DRAWDOWN: `{abs(row['max_drawdown'])*100:.1f}%`")
             st.markdown(f"""
             <div class="progress-container">
                 <div class="progress-bar" style="width:{dd_pct*100}%; background:linear-gradient(90deg, #ff0066, #ff6600)"></div>
