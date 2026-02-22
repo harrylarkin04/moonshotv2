@@ -6,8 +6,7 @@ pyvis
 networkx
 yfinance
 statsmodels
-deap
+deap==3.0.1
 scipy
 openai
 python-dotenv
-groq
