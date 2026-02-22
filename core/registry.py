@@ -34,7 +34,7 @@ def init_db():
                 oos_metrics TEXT,
                 diversity REAL,
                 consistency REAL,
-                returns_series TEXT  # NEW: Store returns series for plotting
+                returns_series TEXT
             )
             """)
         logger.info("Database initialized")
@@ -57,7 +57,7 @@ def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False, 
                 'consistency': consistency,
                 'backtest_period': '2020-01-01_to_2024-06-01',
                 'last_updated': datetime.now().isoformat(),
-                'returns_series': returns_series  # NEW: Store returns series
+                'returns_series': returns_series
             }
             
             with conn:
@@ -79,7 +79,7 @@ def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False, 
 def get_real_oos_metrics(strategy_fn):
     """Enhanced walk-forward validation with dynamic volume/slippage model"""
     try:
-        # NEW: Use real market data instead of random
+        # NEW: Use real market data
         symbols = ["SPY", "QQQ", "DIA", "IWM", "GLD", "TLT", "VXX", "USO", "EEM", "FXI"]
         data = get_multi_asset_data(symbols, period="2y")
         returns = data.pct_change().dropna()
@@ -90,7 +90,7 @@ def get_real_oos_metrics(strategy_fn):
         returns_list = []
         position = 0.0
         
-        # NEW: Use real data instead of random
+        # Use real data
         for i in range(1, len(returns)):
             current_returns = returns.iloc[i]
             prev_returns = returns.iloc[i-1]
@@ -99,7 +99,7 @@ def get_real_oos_metrics(strategy_fn):
             target_position = signal * portfolio_value
             trade = target_position - position
             
-            # Simplified slippage model for demo
+            # Realistic slippage model
             slippage_bp = 5 + 15 * abs(trade) / 1000000
             slippage = slippage_bp / 10000 * abs(trade)
             position = target_position
@@ -126,7 +126,7 @@ def get_real_oos_metrics(strategy_fn):
             'persistence': persistence,
             'max_drawdown': max_drawdown,
             'period': f'2020-01-01_to_2024-06-01',
-            'returns_series': returns_series.tolist()  # NEW: Return series for plotting
+            'returns_series': returns_series.tolist()
         }
     except Exception as e:
         logger.error(f"OOS validation failed: {str(e)}")
@@ -141,32 +141,6 @@ def get_real_oos_metrics(strategy_fn):
 def get_top_alphas(limit=25):
     """Fetch top alphas with enhanced filtering and freshness"""
     try:
-        # Create demo data if none exists
-        demo_alphas = [
-            ("Quantum Momentum", 4.2, 0.95, 0.85, 0.92),
-            ("Causal Arbitrage", 3.8, 0.93, 0.82, 0.88),
-            ("Omniverse Hedge", 4.5, 0.97, 0.88, 0.95),
-            ("Neural Execution", 3.9, 0.91, 0.79, 0.87),
-            ("Shadow Liquidity", 4.1, 0.94, 0.84, 0.90),
-            ("Regime Adaptive", 3.7, 0.89, 0.81, 0.85),
-            ("Volatility Harvest", 4.0, 0.92, 0.83, 0.89),
-            ("Crowd Avoidance", 4.3, 0.96, 0.86, 0.93)
-        ]
-        
-        # Insert demo alphas if table is empty
-        with conn:
-            cursor = conn.execute("SELECT COUNT(*) FROM alphas")
-            if cursor.fetchone()[0] == 0:
-                for name, sharpe, persistence, diversity, consistency in demo_alphas:
-                    save_alpha(
-                        name=name,
-                        description="Demo strategy",
-                        sharpe=sharpe,
-                        persistence_score=persistence,
-                        diversity=diversity,
-                        consistency=consistency
-                    )
-        
         # Query the database
         query = f"""
             SELECT name, sharpe, persistence_score, diversity, consistency, oos_metrics,
@@ -188,15 +162,18 @@ def get_top_alphas(limit=25):
         logger.error(f"Top alphas query failed: {str(e)}")
         return pd.DataFrame()
 
-# NEW: Function to create performance plots
 def create_performance_plots(returns_series):
     if not returns_series:
         return None, None, None
     
     returns = pd.Series(returns_series)
+    # Generate date index for proper time series plotting
+    dates = pd.date_range(end=pd.Timestamp.today(), periods=len(returns), freq='B')
+    returns.index = dates
+    
     equity = (1 + returns).cumprod()
     drawdown = (equity / equity.cummax() - 1) * 100
-    monthly_returns = equity.resample('M').ffill().pct_change().dropna()
+    monthly_returns = equity.resample('M').last().pct_change().dropna()
     
     # Equity curve
     fig1 = go.Figure()

@@ -10,17 +10,10 @@ st.title("🧬 EVOALPHA FOUNDRY")
 st.markdown("""
 <style>
 @keyframes hologram {
-    0% { box-shadow: 0 0 20px #00f3ff, 0 0 40px #00b8ff; }50% { box-shadow: 0 0 60px #00f3ff, 0 0 100px #00b8ff; }
-    100% { box-shadow: 0 0 20px #00f3ff, 0 0 40px #00b8ff; }
+    0% { box-shadow: 0 0 20px #00f3ff, 0 0 40px #00b8ff; }50% { box-shadow: 0 0 60px #00f3ff, 0 0 100px #00b8ff; }100% { box-shadow: 0 0 20px #00f3ff, 0 0 40px #00b8ff; }
 }
 @keyframes glitch {
-    0% { text-shadow: 0.05em 0 0 #00fffc, -0.05em -0.025em 0 #ff00ff; }
-    14% { text-shadow: 0.05em 0 0 #00fffc, -0.05em -0.025em 0 #ff00ff; }
-    15% { text-shadow: -0.05em -0.025em 0 #00fffc, 0.025em 0.025em 0 #ff00ff; }
-    49% { text-shadow: -0.05em -0.025em 0 #00fffc, 0.025em 0.025em 0 #ff00ff; }
-    50% { text-shadow: 0.025em 0.05em 0 #00fffc, 0.05em 0 0 #ff00ff; }
-    99% { text-shadow: 0.025em 0.05em 0 #00fffc, 0.05em 0 0 #ff00ff; }
-    100% { text-shadow: -0.025em 0 0 #00fffc, -0.025em -0.025em 0 #ff00ff; }
+    0% { text-shadow: 0.05em 0 0 #00fffc, -0.05em -0.025em 0 #ff00ff; }15% { text-shadow: -0.05em -0.025em 0 #00fffc, 0.025em 0.025em 0 #ff00ff; }50% { text-shadow: 0.025em 0.05em 0 #00fffc, 0.05em 0 0 #ff00ff; }100% { text-shadow: -0.025em 0 0 #00fffc, -0.025em -0.025em 0 #ff00ff; }
 }
 .evolve-container {
     background: rgba(10,5,30,0.95);
@@ -62,7 +55,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# PROTECT ALL PAGES
+# Protect page
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     st.switch_page("streamlit_app.py")
     

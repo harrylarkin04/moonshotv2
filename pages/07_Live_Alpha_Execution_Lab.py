@@ -69,7 +69,7 @@ if 'logged_in' not in st.session_state or not st.session_state.logged_in:
 st.title("📈 Live Alpha Execution Lab")
 st.caption("Real-time backtesting with slippage and transaction costs")
 
-# IMPROVEMENT: Add loading spinner
+# Load elite alphas
 with st.spinner("Fetching elite alphas..."):
     try:
         alphas = get_top_alphas(10)
@@ -85,7 +85,7 @@ for _, alpha in alphas.iterrows():
     with st.container():
         st.markdown(f"<div class='glass-panel'>", unsafe_allow_html=True)
         
-        # IMPROVEMENT: Enhanced header with persistence score
+        # Enhanced header with persistence score
         st.subheader(f"🔮 {alpha['name']}")
         st.caption(f"Persistence: {alpha.get('persistence_score', 0.0):.2f} | Diversity: {alpha.get('diversity', 0.0):.2f}")
         
@@ -96,7 +96,7 @@ for _, alpha in alphas.iterrows():
             except:
                 metrics = {}
         
-        # IMPROVEMENT: Better metric display
+        # Better metric display
         col1, col2, col3, col4 = st.columns(4)
         with col1:
             st.markdown("""
@@ -130,7 +130,7 @@ for _, alpha in alphas.iterrows():
             </div>
             """.format(alpha['consistency']), unsafe_allow_html=True)
         
-        # NEW: Performance charts
+        # Performance charts
         returns_series = metrics.get('returns_series', [])
         if returns_series:
             equity_fig, drawdown_fig, monthly_fig = create_performance_plots(returns_series)
@@ -146,7 +146,7 @@ for _, alpha in alphas.iterrows():
                     st.plotly_chart(drawdown_fig, use_container_width=True)
                 st.plotly_chart(monthly_fig, use_container_width=True)
         
-        # IMPROVEMENT: OOS metrics with period info
+        # OOS metrics with period info
         if metrics:
             st.markdown("<div class='holo-divider'></div>", unsafe_allow_html=True)
             st.caption(f"OOS Metrics ({metrics.get('period', 'N/A')}):")

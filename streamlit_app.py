@@ -187,7 +187,7 @@ if not st.session_state.logged_in:
         st.markdown('</div>', unsafe_allow_html=True)
 
     if st.button("LOGIN", type="primary", use_container_width=True):
-        # NEW: Simplified credentials for Joseph
+        # Simplified credentials
         valid = False
         if username.lower() == "joseph":
             valid = password == "moonshot2026"
@@ -206,7 +206,7 @@ else:
     with col3: st.metric("Crowding Risk", "0.2%", "↓98%")
     with col4: st.metric("Omniverse Futures", "487M", "live")
 
-    st.subheader("The Six Weapons")  # FIXED: Updated from Five to Six
+    st.subheader("The Six Weapons")
     cols = st.columns(6)
     modules = [
         ("ShadowCrowd Oracle", "pages/01_ShadowCrowd_Oracle.py"),
@@ -214,7 +214,7 @@ else:
         ("Financial Omniverse", "pages/03_Financial_Omniverse.py"),
         ("EvoAlpha Foundry", "pages/04_EvoAlpha_Factory.py"),
         ("Liquidity Teleporter", "pages/05_Liquidity_Teleporter.py"),
-        ("Live Alpha Execution Lab", "pages/07_Live_Alpha_Execution_Lab.py")  # FIXED: Correct page path
+        ("Live Alpha Execution Lab", "pages/07_Live_Alpha_Execution_Lab.py")
     ]
     for col, (name, page) in zip(cols, modules):
         with col:

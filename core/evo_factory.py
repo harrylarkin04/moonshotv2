@@ -123,7 +123,7 @@ toolbox.register("select", tools.selNSGA2)
 
 def evolve_new_alpha(ui_context=True):
     try:
-        # NEW: Actually run evolution instead of demo
+        # Run evolution with real data
         population = toolbox.population(n=50)
         algorithms.eaSimple(population, toolbox, cxpb=0.5, mutpb=0.2, ngen=10, verbose=False)
         
