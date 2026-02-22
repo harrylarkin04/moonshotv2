@@ -98,7 +98,8 @@ st.markdown("""
         <span class="metric-badge">DRAWDOWN <10%</span>
         <span class="metric-badge">CAPACITY >$1B</span>
         <span class="metric-badge">DIVERSITY >0.3</span>
-        <span class="metric-badge">CONSISTENCY >0.7</span>  <!-- NEW METRIC -->
+        <span class="metric-badge">CONSISTENCY >0.7</span>
+        <span class="metric-badge" style="background:linear-gradient(45deg, #ff00ff, #ff66ff)">NOVELTY >0.5</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -133,15 +134,17 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# NEW: Evolution controls sidebar
+# Evolution controls sidebar
 with st.sidebar.expander("⚙️ EVOLUTION PARAMETERS"):
     st.session_state.pop_size = st.slider("Population Size", 500, 2000, 1200, 100)
     st.session_state.max_gens = st.slider("Max Generations", 20, 100, 50, 5)
     st.session_state.elite_rate = st.slider("Elite Rate", 0.01, 0.2, 0.05, 0.01)
+    st.session_state.novelty_weight = st.slider("Novelty Weight", 0.1, 1.0, 0.4, 0.05)
 
 # Holographic visualization placeholder
 st.subheader("EVOLUTIONARY PERFORMANCE")
 hologram_placeholder = st.empty()
+novelty_placeholder = st.empty()
 
 if st.button("⚡ IGNITE EVOLUTIONARY FOUNDRY", type="primary", use_container_width=True, 
              help="Run full closed-loop evolution (takes 2-5 minutes)"):
@@ -155,7 +158,7 @@ if st.button("⚡ IGNITE EVOLUTIONARY FOUNDRY", type="primary", use_container_wi
         else:
             result_placeholder.warning("⚠️ Evolution completed - no elite alphas met strict criteria")
 
-st.subheader("ELITE STRATEGY ZOO (Sharpe >3.5 | Persistence >0.8 | Drawdown <10% | Diversity >0.3 | Consistency >0.7)")
+st.subheader("ELITE STRATEGY ZOO (Sharpe >3.5 | Persistence >0.8 | Drawdown <10% | Diversity >0.3 | Consistency >0.7 | Novelty >0.5)")
 top_alphas = get_top_alphas(25)
 if not top_alphas.empty:
     # Enhanced display with progress bars
@@ -164,9 +167,9 @@ if not top_alphas.empty:
         with col1:
             st.markdown(f"**{row['name']}**")
             st.caption(row['description'])
-            # Display diversity and consistency metrics
+            # Display diversity and novelty metrics
             st.markdown(f"**Diversity:** `{row.get('diversity', 0.0):.3f}`")
-            st.markdown(f"**Consistency:** `{row.get('consistency', 0.0):.3f}`")
+            st.markdown(f"**Novelty:** `{row.get('novelty', 0.0):.3f}`")
         with col2:
             # Sharpe progress
             sharpe_pct = min(row['sharpe'] / 5.0, 1.0)
@@ -177,8 +180,7 @@ if not top_alphas.empty:
             </div>
             """, unsafe_allow_html=True)
             
-            # Drawdown progress
-            dd_pct = min(abs(row['max_drawdown']) / 0.2, 1.0)
+            # Drawdown progressdd_pct = min(abs(row['max_drawdown']) / 0.2, 1.0)
             st.markdown(f"DRAWDOWN: `{row['max_drawdown']*100:.1f}%`")
             st.markdown(f"""
             <div class="progress-container">
@@ -192,6 +194,15 @@ if not top_alphas.empty:
             st.markdown(f"""
             <div class="progress-container">
                 <div class="progress-bar" style="width:{cap_pct*100}%; background:linear-gradient(90deg, #00cc66, #00ff99)"></div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Novelty progress
+            novelty_pct = min(row.get('novelty', 0.0) / 1.0, 1.0)
+            st.markdown(f"NOVELTY: `{row.get('novelty', 0.0):.3f}`")
+            st.markdown(f"""
+            <div class="progress-container">
+                <div class="progress-bar" style="width:{novelty_pct*100}%; background:linear-gradient(90deg, #ff00ff, #ff66ff)"></div>
             </div>
             """, unsafe_allow_html=True)
         

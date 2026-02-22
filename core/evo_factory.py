@@ -6,11 +6,12 @@ import pandas as pd
 import logging
 import json
 import math
-from scipy.spatial.distance import euclidean
+from scipy.spatial.distance import euclidean, pdist, squareform
 from concurrent.futures import ProcessPoolExecutor
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from sklearn.neural_network import MLPRegressor
+from sklearn.decomposition import PCA
 from core.data_fetcher import get_train_test_data
 from core.registry import save_alpha
 from core.causal_engine import swarm_generate_hypotheses, build_causal_dag
@@ -22,7 +23,18 @@ from core.liquidity_teleporter import optimal_execution_trajectory
 MAX_WORKERS = 8
 logger = logging.getLogger(__name__)
 
-creator.create("FitnessMax", base.Fitness, weights=(1.0, 0.5, -0.2, 0.3))  # Added Sortino weight
+# Quantum novelty preservation system
+NOVELTY_ARCHIVE = []
+BEHAVIOR_CHARACTERIZATION = {}
+
+# Remove existing creator classes to avoid conflicts
+if "FitnessMax" in creator.__dict__:
+    del creator.FitnessMax
+if "Individual" in creator.__dict__:
+    del creator.Individual
+
+# Enhanced fitness with novelty objective
+creator.create("FitnessMax", base.Fitness, weights=(1.0, 0.5, -0.2, 0.3, 0.4))  # Added novelty weight
 creator.create("Individual", list, fitness=creator.FitnessMax)
 
 toolbox = base.Toolbox()
@@ -30,26 +42,66 @@ toolbox.register("attr_int", random.randint, 5, 200)
 toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_int, n=10)
 toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
-def calculate_diversity(population):
-    """Enhanced diversity calculation with 3D mapping"""
-    if len(population) < 2:
-        return 0.0, np.array([])
+def characterize_behavior(individual, returns):
+    """Create behavioral fingerprint for novelty detection"""
+    params = [int(x) for x in individual]
+    asset_weights = np.array(params[:4])[:len(returns.columns)]
+    asset_weights = asset_weights / asset_weights.sum()
     
-    pop_array = np.array(population)
-    centroid = np.mean(pop_array, axis=0)
+    # Generate strategy signals
+    signals = pd.DataFrame()
+    for col in returns.columns:
+        price = (1 + returns[col]).cumprod()
+        sma_signal = (price.rolling(params[4]).mean() > price.rolling(params[5]).mean()).astype(int)
+        rsi = 100 - (100 / (1 + (returns[col].rolling(params[6]).mean() / abs(returns[col]).rolling(params[6]).mean())))
+        rsi_signal = (rsi > params[7]).astype(int)
+        signals[col] = (sma_signal * 0.6 + rsi_signal * 0.4)
+    
+    # Behavioral fingerprint: strategy statistics
+    position = signals.rolling(params[5]).mean().diff().fillna(0)
+    fingerprint = [
+        position.mean().mean(),
+        position.std().mean(),
+        position.skew().mean(),
+        position.kurtosis().mean(),
+        (position > 0).mean().mean(),
+        position.autocorr().mean()
+    ]
+    return tuple(fingerprint)
+
+def calculate_novelty(individual, population, archive):
+    """Quantum-inspired novelty metric with entanglement"""
+    all_points = list(BEHAVIOR_CHARACTERIZATION.values()) + archive
+    if len(all_points) < 2:
+        return 0.0
+    
+    # Calculate distances in behavioral space
+    dist_matrix = squareform(pdist(np.array(all_points)))
+    k = min(15, len(all_points))
+    ind_index = list(BEHAVIOR_CHARACTERIZATION.keys()).index(id(individual))
+    distances = dist_matrix[ind_index]
+    distances.sort()
+    return np.mean(distances[:k])
+
+def calculate_diversity(population):
+    """Enhanced diversity calculation with quantum entanglement"""
+    if len(population) < 2:
+        return 0.0, np.array([]), np.array([])
+    
+    # Behavioral diversity
+    behaviors = [BEHAVIOR_CHARACTERIZATION.get(id(ind), np.zeros(6)) for ind in population]
+    centroid = np.mean(behaviors, axis=0)
+    distances = [euclidean(b, centroid) for b in behaviors]
+    diversity_index = np.mean(distances)
     
     # 3D PCA projection for diversity visualization
-    if pop_array.shape[1] >= 3:
-        cov = np.cov(pop_array.T)
-        eigenvalues, eigenvectors = np.linalg.eig(cov)
-        order = np.argsort(eigenvalues)[::-1]
-        projection = pop_array.dot(eigenvectors[:, order[:3]])
+    if len(behaviors) >= 3:
+        pca = PCA(n_components=3)
+        projection = pca.fit_transform(behaviors)
     else:
         projection = np.zeros((len(population), 3))
     
-    distances = [euclidean(ind, centroid) for ind in population]
-    diversity_index = np.mean(distances)
-    return diversity_index, projection
+    return diversity_index, projection, np.array(behaviors)
 
 def backtest(individual, returns, fold_count=5):
     """Enhanced backtesting with liquidity-aware position sizing"""
@@ -67,6 +119,8 @@ def backtest(individual, returns, fold_count=5):
     # Walk-forward validation with multiple folds
     fold_size = len(returns) // fold_count
     wf_results = []
+    all_returns = pd.Series(dtype=float)
+    
     for fold in range(fold_count):
         start_idx = fold * fold_size
         end_idx = (fold + 1) * fold_size if fold < fold_count - 1 else len(returns)
@@ -99,6 +153,7 @@ def backtest(individual, returns, fold_count=5):
         position_changes = position.diff().fillna(0)
         impact_costs = position_changes.abs() * 0.0005  # Institutional costs
         weighted_returns = (position.shift(1) * returns - impact_costs).sum(axis=1)
+        all_returns = pd.concat([all_returns, weighted_returns])
         
         # Performance metrics with Sortino ratio
         cumulative = (1 + weighted_returns).cumprod()
@@ -124,7 +179,7 @@ def backtest(individual, returns, fold_count=5):
     
     # Aggregate results with consistency metric
     if not wf_results:
-        return {'sharpe': 0, 'sortino': 0, 'max_drawdown': 0, 'capacity': 0, 'consistency': 0}
+        return {'sharpe': 0, 'sortino': 0, 'max_drawdown': 0, 'capacity': 0, 'consistency': 0}, all_returns
     
     sharpe_std = np.std([r['sharpe'] for r in wf_results])
     avg_sharpe = np.mean([r['sharpe'] for r in wf_results])
@@ -137,13 +192,16 @@ def backtest(individual, returns, fold_count=5):
         'max_drawdown': np.mean([r['max_drawdown'] for r in wf_results]),
         'capacity': np.mean([r['capacity'] for r in wf_results]),
         'consistency': consistency
-    }
+    }, all_returns
 
 def evaluate(individual):
-    """Enhanced evaluation with quantum entanglement scoring"""
+    """Enhanced evaluation with quantum novelty scoring"""
     try:
         is_returns, oos_returns = get_train_test_data()
-        is_metrics = backtest(individual, is_returns, fold_count=5)
+        is_metrics, strategy_returns = backtest(individual, is_returns, fold_count=5)
+        
+        # Behavioral characterization for novelty
+        BEHAVIOR_CHARACTERIZATION[id(individual)] = characterize_behavior(individual, is_returns)
         
         # Neural validation gate
         X = np.array(individual).reshape(1, -1)
@@ -153,11 +211,11 @@ def evaluate(individual):
         nn_sharpe = nn.predict(X)[0]
         
         if abs(is_metrics['sharpe'] - nn_sharpe) > 0.5:
-            return 0.0, 0.0, 0.0, 0.0
+            return 0.0, 0.0, 0.0, 0.0, 0.0
         
         # Full pipeline validation
         if not swarm_generate_hypotheses(is_returns):
-            return 0.0, 0.0, 0.0, 0.0
+            return 0.0, 0.0, 0.0, 0.0, 0.0
         
         G = build_causal_dag(is_returns)
         causal_score = len(G.edges) / 100
@@ -165,7 +223,7 @@ def evaluate(individual):
         omniverse_score = run_omniverse_sims(scenario="Stress", num_sims=5000)
         crowd_risk = simulate_cascade_prob()
         
-        oos_metrics = backtest(individual, oos_returns, fold_count=3)
+        oos_metrics, _ = backtest(individual, oos_returns, fold_count=3)
         overfit_penalty = abs(is_metrics['sharpe'] - oos_metrics['sharpe']) * 0.7
         
         # Composite fitness score with quantum entanglement
@@ -190,13 +248,13 @@ def evaluate(individual):
             'consistency': oos_metrics['consistency']
         }
         
-        return fitness, oos_metrics['consistency'], causal_score, oos_metrics['sortino']
+        return fitness, oos_metrics['consistency'], causal_score, oos_metrics['sortino'], 0.0
     except Exception as e:
         logger.error(f"Evaluation failed: {e}")
-        return 0.0, 0.0, 0.0, 0.0
+        return 0.0, 0.0, 0.0, 0.0, 0.0
 
 def init_toolbox():
-    """Initialize with quantum entanglement crossover"""
+    """Initialize with quantum novelty preservation"""
     toolbox.register("evaluate", evaluate)
     toolbox.register("select", tools.selTournament, tournsize=7)
     
@@ -236,18 +294,34 @@ def init_toolbox():
     toolbox.register("mutate", adaptive_mutate)
 
 def parallel_evaluate(population):
-    """Parallel evaluation with progress tracking"""
+    """Parallel evaluation with novelty scoring"""
     with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = [executor.submit(toolbox.evaluate, ind) for ind in population]
         results = [f.result() for f in futures]
     
-    for ind, (fit, consistency, causal, sortino) in zip(population, results):
-        ind.fitness.values = (fit, consistency, causal, sortino)
+    # Calculate novelty scores
+    for ind in population:
+        novelty = calculate_novelty(ind, population, NOVELTY_ARCHIVE)
+        ind.fitness.novelty = novelty
+    
+    # Update archive with novel individuals
+    avg_novelty = np.mean([ind.fitness.novelty for ind in population])
+    for ind in population:
+        if ind.fitness.novelty > avg_novelty * 1.5:
+            NOVELTY_ARCHIVE.append(BEHAVIOR_CHARACTERIZATION[id(ind)])
+    
+    # Combine results with novelty
+    for ind, (fit, consistency, causal, sortino, _) in zip(population, results):
+        ind.fitness.values = (fit, consistency, causal, sortino, ind.fitness.novelty)
     return population
 
 def evolve_new_alpha(ui_context=False):
-    """Enhanced evolution with holographic quantum field visualization"""
+    """Enhanced evolution with quantum novelty preservation"""
     try:
+        global NOVELTY_ARCHIVE, BEHAVIOR_CHARACTERIZATION
+        NOVELTY_ARCHIVE = []
+        BEHAVIOR_CHARACTERIZATION = {}
+        
         is_returns, _ = get_train_test_data()
         hypotheses = swarm_generate_hypotheses(is_returns)
         current_hypothesis = hypotheses[0] if hypotheses else "AI-generated market edge"
@@ -261,10 +335,12 @@ def evolve_new_alpha(ui_context=False):
             live_stats = st.empty()
             diversity_placeholder = st.empty()
             hologram_placeholder = st.empty()
+            novelty_placeholder = st.empty()
             
             with st.sidebar.expander("⚡ QUANTUM EVOLUTION CONTROLS"):
                 st.session_state.quantum_temp = st.slider("Quantum Temperature", 0.1, 1.0, 0.3, 0.05)
                 st.session_state.diversity_threshold = st.slider("Diversity Threshold", 0.1, 0.9, 0.4, 0.05)
+                st.session_state.novelty_weight = st.slider("Novelty Weight", 0.1, 1.0, 0.4, 0.05)
                 st.session_state.neural_validation = st.checkbox("Neural Validation Gate", True)
                 st.session_state.fold_count = st.slider("Validation Folds", 3, 10, 5, 1)
                 st.session_state.pop_size = st.slider("Population Size", 500, 2000, 1200, 100)
@@ -282,6 +358,7 @@ def evolve_new_alpha(ui_context=False):
         
         generation_data = []
         diversity_history = []
+        novelty_history = []
         best_fitness_history = []
         stagnation_counter = 0
         prev_best = -np.inf
@@ -295,8 +372,9 @@ def evolve_new_alpha(ui_context=False):
             pop = parallel_evaluate(pop)
             hof.update(pop)
             
-            diversity, projection = calculate_diversity(pop)
+            diversity, projection, behaviors = calculate_diversity(pop)
             diversity_history.append(diversity)
+            novelty_history.append(np.mean([ind.fitness.novelty for ind in pop]))
             
             record = stats.compile(pop)
             current_best = record['max']
@@ -317,7 +395,9 @@ def evolve_new_alpha(ui_context=False):
                 "max_fitness": record['max'],
                 "min_fitness": record['min'],
                 "diversity": diversity,
+                "novelty": np.mean([ind.fitness.novelty for ind in pop]),
                 "projection": projection,
+                "behaviors": behaviors,
                 "top_individuals": [ind[:] for ind in tools.selBest(pop, 5)]
             }
             generation_data.append(gen_data)
@@ -327,6 +407,7 @@ def evolve_new_alpha(ui_context=False):
                 **QUANTUM FIELD**  
                 Max Fitness: `{record['max']:.2f}` ⚡  
                 Diversity: `{diversity:.4f}` 🌐  
+                Novelty: `{gen_data['novelty']:.4f}` 🌀  
                 Stagnation: `{stagnation_counter}/5` ⏳  
                 Elites: `{elite_counter}` 🚀
                 """)
@@ -342,7 +423,7 @@ def evolve_new_alpha(ui_context=False):
                             mode='markers',
                             marker=dict(
                                 size=6,
-                                color=[ind.fitness.values[0] for ind in pop],
+                                color=[ind.fitness.values[4] for ind in pop],  # Novelty score
                                 colorscale='Viridis',
                                 opacity=0.9,
                                 line=dict(width=1, color='#00f3ff')
@@ -369,10 +450,29 @@ def evolve_new_alpha(ui_context=False):
                         scene=dict(
                             xaxis_title='Entanglement Axis 1',
                             yaxis_title='Entanglement Axis 2',
-                            zaxis_title='Fitness Axis'
+                            zaxis_title='Novelty Axis'
                         )
                     )
                     hologram_placeholder.plotly_chart(fig, use_container_width=True)
+                    
+                # Novelty visualization
+                with novelty_placeholder.container():
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(
+                        x=gens, y=novelty_history,
+                        mode='lines+markers',
+                        line=dict(color='#ff00ff', width=3),
+                        name='Novelty Score'
+                    ))
+                    fig.update_layout(
+                        title="NOVELTY EVOLUTION",
+                        template='plotly_dark',
+                        height=300,
+                        xaxis_title='Generation',
+                        yaxis_title='Novelty',
+                        margin=dict(l=20, r=20, t=50, b=20)
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
             
             # Select next generation with diversity preservation
             elites = tools.selBest(pop, int(len(pop)*0.05))
@@ -409,10 +509,11 @@ def evolve_new_alpha(ui_context=False):
                     metrics.get('omniverse_score', 0) > 0.7 and
                     metrics.get('overfit_penalty', 1) < 0.2 and
                     diversity > st.session_state.diversity_threshold and
-                    metrics.get('consistency', 0) > 0.7):
+                    metrics.get('consistency', 0) > 0.7 and
+                    best.fitness.values[4] > 0.5):  # Novelty threshold
                     
                     name = f"QuantumAlpha_{random.randint(10000,99999)}"
-                    desc = f"{current_hypothesis} – evolved through Quantum Evo v7"
+                    desc = f"{current_hypothesis} – evolved through Quantum Evo v8"
                     
                     if save_alpha(
                         name, 
@@ -420,7 +521,8 @@ def evolve_new_alpha(ui_context=False):
                         round(oos_metrics['sharpe'], 2), 
                         round(1 - abs(metrics['in_sample']['sharpe'] - oos_metrics['sharpe']), 2),
                         metrics=json.dumps(metrics),
-                        diversity=diversity
+                        diversity=diversity,
+                        novelty=best.fitness.values[4]
                     ):
                         elite_counter += 1
                         if ui_context:
