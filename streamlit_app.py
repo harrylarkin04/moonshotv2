@@ -1,92 +1,109 @@
 import streamlit as st
 
-# ====================== CONFIG ======================
-st.set_page_config(
-    page_title="Moonshot",
-    page_icon="🚀",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="Moonshot", page_icon="🚀", layout="wide")
 
-# ====================== STABLE CYBERPUNK STYLE ======================
+# ====================== PREMIUM CYBERPUNK STYLE ======================
 st.markdown("""
 <style>
     .stApp {
-        background: linear-gradient(180deg, #0a0a0f 0%, #1a0033 100%);
+        background: linear-gradient(135deg, #0a0a0f 0%, #120022 50%, #1a0033 100%);
         color: #00f5ff;
     }
-    h1 {
-        text-shadow: 0 0 15px #00ffff, 0 0 30px #ff00ff;
-        animation: none !important;
+    .main-title {
+        font-size: 5.2rem;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 12px;
+        background: linear-gradient(90deg, #00ffff, #ff00ff, #00ffff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-shadow: 
+            0 0 20px #00ffff,
+            0 0 40px #ff00ff,
+            0 0 80px #00ffff;
+        text-align: center;
+        margin-bottom: 0;
     }
-    .stButton button {
-        background: transparent;
-        border: 2px solid #ff00ff;
+    .subtitle {
+        text-align: center;
+        font-size: 1.5rem;
+        color: #a0f0ff;
+        letter-spacing: 6px;
+        margin-bottom: 50px;
+    }
+    .nav-button {
+        background: rgba(255,255,255,0.03);
+        border: 2px solid #00ffff;
         color: #00ffff;
+        font-weight: bold;
+        padding: 1.4rem 2rem;
+        border-radius: 16px;
+        transition: all 0.4s ease;
+        text-align: center;
+        font-size: 1.25rem;
+        box-shadow: 0 0 15px rgba(0,255,255,0.3);
     }
-    .stButton button:hover {
-        box-shadow: 0 0 25px #ff00ff;
-        background: #ff00ff;
+    .nav-button:hover {
+        background: linear-gradient(45deg, #ff00ff, #00ffff);
         color: #0a0a0f;
+        box-shadow: 0 0 40px #ff00ff, 0 0 70px #00ffff;
+        transform: translateY(-4px);
+        border-color: #ffffff;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# ====================== SIMPLE LOGIN FOR JOSEPH ======================
+# ====================== LOGIN FOR JOSEPH ======================
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 if not st.session_state.logged_in:
-    st.title("🚀 Moonshot")
-    st.subheader("Quant Trading Intelligence Platform")
+    st.markdown('<h1 class="main-title">MOONSHOT</h1>', unsafe_allow_html=True)
+    st.markdown('<p class="subtitle">CLOSED-LOOP QUANT INTELLIGENCE PLATFORM</p>', unsafe_allow_html=True)
 
-    username = st.text_input("Username", placeholder="")
-    password = st.text_input("Password", type="password", placeholder="")
+    col1, col2, col3 = st.columns([1,2,1])
+    with col2:
+        username = st.text_input("Username", placeholder="")
+        password = st.text_input("Password", type="password", placeholder="")
 
-    if st.button("Login", type="primary"):
-        if username == "joseph" and password == "moonshot2026":
-            st.session_state.logged_in = True
-            st.rerun()
-        else:
-            st.error("Wrong credentials")
+        if st.button("ENTER THE GRID", type="primary", use_container_width=True):
+            if username.lower() == "joseph" and password == "moonshot2026":
+                st.session_state.logged_in = True
+                st.rerun()
+            else:
+                st.error("ACCESS DENIED")
     st.stop()
 
-# ====================== MAIN APP ======================
-st.title("🚀 Moonshot")
-st.markdown("**Next-generation closed-loop quant trading platform**")
+# ====================== MAIN HOMEPAGE ======================
+st.markdown('<h1 class="main-title">MOONSHOT</h1>', unsafe_allow_html=True)
+st.markdown('<p class="subtitle">NEXT-GENERATION QUANT TRADING SYSTEM</p>', unsafe_allow_html=True)
 
 st.divider()
 
-col1, col2, col3 = st.columns(3)
+# Navigation Grid
+col1, col2 = st.columns(2)
 
 with col1:
-    if st.button("🌌 CausalForge Engine", use_container_width=True):
+    if st.button("🌌 CausalForge Engine", key="cf", use_container_width=True):
         st.switch_page("pages/02_CausalForge_Engine.py")
-
-with col2:
-    if st.button("🔥 EvoAlpha Factory", use_container_width=True):
+    if st.button("🔥 EvoAlpha Factory", key="evo", use_container_width=True):
         st.switch_page("pages/04_EvoAlpha_Factory.py")
 
-with col3:
-    if st.button("📈 Live Alpha Execution Lab", use_container_width=True):
+with col2:
+    if st.button("📈 Live Alpha Execution Lab", key="lab", use_container_width=True):
         st.switch_page("pages/07_Live_Alpha_Execution_Lab.py")
-
-st.divider()
-
-col4, col5, col6 = st.columns(3)
-
-with col4:
-    if st.button("👥 ShadowCrowd Oracle", use_container_width=True):
+    if st.button("👥 ShadowCrowd Oracle", key="sc", use_container_width=True):
         st.switch_page("pages/01_ShadowCrowd_Oracle.py")
 
-with col5:
-    if st.button("🌌 Financial Omniverse", use_container_width=True):
+col3, col4 = st.columns(2)
+
+with col3:
+    if st.button("🌌 Financial Omniverse", key="omni", use_container_width=True):
         st.switch_page("pages/03_Financial_Omniverse.py")
 
-with col6:
-    if st.button("💰 Impact Dashboard", use_container_width=True):
+with col4:
+    if st.button("💰 Impact Dashboard", key="impact", use_container_width=True):
         st.switch_page("pages/06_Impact_Dashboard.py")
 
 st.divider()
-
-st.caption("Built for institutional-grade performance • All alphas evolved from real LLM causal hypotheses")
+st.caption("Real causal hypotheses • Real multi-factor evolution • Real out-of-sample results")
