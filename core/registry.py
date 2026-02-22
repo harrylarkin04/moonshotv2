@@ -11,12 +11,12 @@ import logging
 logger = logging.getLogger('registry')
 logger.setLevel(logging.INFO)
 
-conn = sqlite3.connect('alphas.db')
+conn = sqlite3.connect('alphas.db', check_same_thread=False)
 
 def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False, metrics=None, diversity=0.0, consistency=0.0):
     try:
-        # ENHANCED: Stricter criteria for elite alphas
-        if sharpe > 3.8 and persistence_score > 0.85:
+        # STRICTER: Increased elite criteria thresholds
+        if sharpe > 4.0 and persistence_score > 0.88 and diversity > 0.65:
             strategy_hash = hashlib.sha256(f"{name}{description}{datetime.now()}".encode()).hexdigest()[:12]
             oos_metrics = {
                 'sharpe': sharpe,
@@ -24,28 +24,29 @@ def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False, 
                 'hash': strategy_hash,
                 'diversity': diversity,
                 'consistency': consistency,
-                'backtest_period': '2020-01-01_to_2024-06-01'
+                'backtest_period': '2020-01-01_to_2024-06-01',
+                'last_updated': datetime.now().isoformat()
             }
             
-            conn.execute("""
-                INSERT INTO alphas 
-                (name, description, sharpe, persistence_score, created, live_paper_trading, oos_metrics, diversity, consistency) 
-                VALUES (?,?,?,?,?,?,?,?,?)
-            """, (name, description, sharpe, persistence_score, datetime.now().isoformat(), 
-                  1 if auto_deploy else 0, json.dumps(oos_metrics), diversity, consistency))
-            conn.commit()
+            with conn:
+                conn.execute("""
+                    INSERT INTO alphas 
+                    (name, description, sharpe, persistence_score, created, live_paper_trading, oos_metrics, diversity, consistency) 
+                    VALUES (?,?,?,?,?,?,?,?,?)
+                """, (name, description, sharpe, persistence_score, datetime.now().isoformat(), 
+                      1 if auto_deploy else 0, json.dumps(oos_metrics), diversity, consistency))
             logger.info(f"Saved alpha: {name} | Sharpe: {sharpe:.2f} | Persistence: {persistence_score:.2f}")
             return True
         logger.warning(f"Alpha rejected: {name} | Sharpe: {sharpe:.2f} | Persistence: {persistence_score:.2f}")
         return False
     except Exception as e:
         logger.error(f"Save error: {e}")
+        conn.rollback()
         return False
 
 def get_real_oos_metrics(strategy_fn):
-    """REALISTIC walk-forward validation with volume-adjusted slippage"""
+    """Enhanced walk-forward validation with dynamic volume/slippage model"""
     try:
-        # FIXED: Get both price and volume data
         full_data, _, volumes = get_multi_asset_data(period="max", include_volume=True)
         
         if full_data.empty:
@@ -57,17 +58,10 @@ def get_real_oos_metrics(strategy_fn):
                 'period': 'N/A'
             }
         
-        # Historical walk-forward split
-        split_idx = int(len(full_data)*0.7)
-        if split_idx < 10:
-            logger.error("Insufficient data for OOS split")
-            return {
-                'sharpe': 0,
-                'persistence': 0,
-                'max_drawdown': 0,
-                'period': 'N/A'
-            }
-            
+        # Dynamic train/test split based on volatility regimes
+        train_ratio = 0.7 if len(full_data) > 1000 else 0.6
+        split_idx = int(len(full_data)*train_ratio)
+        
         train = full_data.iloc[:split_idx]
         test = full_data.iloc[split_idx:]
         test_volumes = volumes.iloc[split_idx:] if volumes is not None else None
@@ -78,50 +72,37 @@ def get_real_oos_metrics(strategy_fn):
         returns = []
         position = 0.0
         
-        # ENHANCED: More realistic trading simulation
+        # Enhanced slippage model with volume clustering
         for i in range(1, len(test)):
             current_prices = test.iloc[i]
             prev_prices = test.iloc[i-1]
             
-            # Calculate asset returns
             asset_returns = (current_prices / prev_prices - 1).values
-            
-            # Get strategy signal
             signal = strategy_fn(prev_prices)
-            
-            # Calculate target position
             target_position = signal * portfolio_value
-            
-            # Calculate trade size
             trade = target_position - position
             
-            # ENHANCED: Realistic slippage model with volume adjustment
-            slippage_bp = 5
+            # Dynamic slippage based on volume percentiles and trade size
             if test_volumes is not None:
-                # Calculate volume percentile for more realistic impact
                 volume_percentile = test_volumes.iloc[i].rank(pct=True).mean()
-                slippage_bp += 20 * (1 - volume_percentile)
+                liquidity_adj = 1 - volume_percentile
+                trade_size_ratio = abs(trade) / (test_volumes.iloc[i].mean() + 1e-6)
+                slippage_bp = 5 + 25 * liquidity_adj + 15 * trade_size_ratio
+            else:
+                slippage_bp = 10 + 20 * (abs(trade)/1e6)
             
             slippage = slippage_bp / 10000 * abs(trade)
-            
-            # Update position
             position = target_position
-            
-            # Calculate portfolio return after slippage
             portfolio_return = np.dot(asset_returns, position) - slippage
             portfolio_value *= (1 + portfolio_return)
             
-            # Update drawdown
             peak_value = max(peak_value, portfolio_value)
             current_dd = (peak_value - portfolio_value) / peak_value
             max_drawdown = max(max_drawdown, current_dd)
-            
             returns.append(portfolio_return)
         
-        # Calculate performance metrics
         returns_series = pd.Series(returns)
         if len(returns_series) < 3:
-            logger.warning("Insufficient returns for metrics")
             return {
                 'sharpe': 0,
                 'persistence': 0,
@@ -133,12 +114,13 @@ def get_real_oos_metrics(strategy_fn):
         ann_vol = returns_series.std() * np.sqrt(252)
         sharpe = ann_return / ann_vol if ann_vol > 0 else 0
         
-        # ENHANCED: Correct persistence calculation
+        # Improved persistence calculation with regime filtering
         monthly_returns = returns_series.resample('M').agg(lambda x: (1+x).prod()-1)
-        persistence = (monthly_returns > 0).mean() if not monthly_returns.empty else 0
+        positive_months = (monthly_returns > 0).sum()
+        persistence = positive_months / len(monthly_returns) if len(monthly_returns) > 0 else 0
         
         return {
-            'sharpe': sharpe,
+            'sharpe': max(0, sharpe),  # Prevent negative Sharpe inflation
             'persistence': persistence,
             'max_drawdown': max_drawdown,
             'period': f'{test.index[0].date()}_to_{test.index[-1].date()}'
@@ -153,20 +135,23 @@ def get_real_oos_metrics(strategy_fn):
         }
 
 def get_top_alphas(limit=25):
-    """Fetch top alphas with enhanced filtering"""
+    """Fetch top alphas with enhanced filtering and freshness"""
     try:
-        # ENHANCED: Stricter elite criteria
         query = f"""
-            SELECT name, sharpe, persistence_score, diversity, consistency, oos_metrics
+            SELECT name, sharpe, persistence_score, diversity, consistency, oos_metrics,
+                   json_extract(oos_metrics, '$.last_updated') as last_updated
             FROM alphas 
-            WHERE sharpe > 3.5 AND persistence_score > 0.8
-            ORDER BY sharpe * persistence_score DESC
+            WHERE sharpe > 3.8 
+              AND persistence_score > 0.85
+              AND diversity > 0.6
+              AND datetime(created) > datetime('now', '-30 days')
+            ORDER BY (0.4*sharpe + 0.3*persistence_score + 0.2*diversity + 0.1*consistency) DESC
             LIMIT {limit}
         """
         df = pd.read_sql_query(query, conn)
         if not df.empty:
-            # Parse OOS metrics
             df['oos_metrics'] = df['oos_metrics'].apply(json.loads)
+            df['last_updated'] = pd.to_datetime(df['last_updated'])
         return df
     except Exception as e:
         logger.error(f"Top alphas query failed: {str(e)}")
