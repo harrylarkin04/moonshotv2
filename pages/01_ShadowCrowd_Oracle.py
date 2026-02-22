@@ -64,6 +64,12 @@ st.markdown("""
     50% { background-position: 100% 50%; }
     100% { background-position: 0% 50%; }
 }
+
+/* CLICK EFFECT */
+.holographic-panel:active {
+    transform: scale(0.98);
+    box-shadow: 0 0 20px rgba(0,243,255,0.6);
+}
 </style>
 """, unsafe_allow_html=True)
 

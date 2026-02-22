@@ -49,7 +49,7 @@ def get_real_oos_metrics(strategy_fn):
     try:
         adj_close, returns, volumes = get_multi_asset_data(period="max", include_volume=True)
         
-        if returns.empty:
+        if returns.empty or volumes.empty:
             logger.error("No data available for OOS validation")
             return {
                 'sharpe': 0,
