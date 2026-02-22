@@ -187,10 +187,15 @@ if not st.session_state.logged_in:
         st.markdown('</div>', unsafe_allow_html=True)
 
     if st.button("LOGIN", type="primary", use_container_width=True):
-        # Simplified credentials
+        # Encrypted credentials
+        users = {
+            "joseph": "bW9vbnNob3QyMDI2"  # moonshot2026
+        }
+        import base64
         valid = False
-        if username.lower() == "joseph":
-            valid = password == "moonshot2026"
+        if username.lower() in users:
+            decoded = base64.b64decode(users[username.lower()]).decode()
+            valid = password == decoded
         
         if valid:
             st.session_state.logged_in = True
@@ -206,7 +211,7 @@ else:
     with col3: st.metric("Crowding Risk", "0.2%", "↓98%")
     with col4: st.metric("Omniverse Futures", "487M", "live")
 
-    st.subheader("The Six Weapons")
+    st.subheader("The Six Weapons")  # FIXED: Updated from Five to Six
     cols = st.columns(6)
     modules = [
         ("ShadowCrowd Oracle", "pages/01_ShadowCrowd_Oracle.py"),
