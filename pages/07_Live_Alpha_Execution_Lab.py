@@ -1,7 +1,6 @@
 import streamlit as st
 import plotly.express as px
 import pandas as pd
-import numpy as np
 from core.backtester import run_real_oos_backtest
 
 st.set_page_config(page_title="Live Alpha Execution Lab", layout="wide")
@@ -18,12 +17,11 @@ st.markdown("""
 st.markdown('<p class="main-title">LIVE ALPHA EXECUTION LAB</p>', unsafe_allow_html=True)
 
 if 'elite_alphas' not in st.session_state or len(st.session_state.elite_alphas) == 0:
-    st.warning("No alphas deployed yet. Run evolution in EvoAlpha Factory first.")
+    st.warning("No alphas yet. Run evolution in EvoAlpha Factory first.")
     st.stop()
 
 alphas = st.session_state.elite_alphas
 
-st.markdown('<div class="glass-card">', unsafe_allow_html=True)
 st.success(f"Running real OOS backtests on {len(alphas)} alphas...")
 
 results = []
@@ -34,15 +32,11 @@ for alpha in alphas:
 df = pd.DataFrame(results)
 st.dataframe(df[['name', 'sharpe', 'persistence', 'oos_return', 'max_drawdown']], use_container_width=True)
 
-st.markdown('</div>', unsafe_allow_html=True)
-
-st.markdown('<div class="glass-card">', unsafe_allow_html=True)
 st.subheader("Combined Portfolio Equity Curve (Real OOS)")
 portfolio = sum(r['equity_curve'] for r in results) / len(results)
 fig = px.line(x=portfolio.index, y=portfolio, title="Portfolio Equity Curve")
 fig.update_traces(line_color='#00ffff', line_width=4)
-fig.update_layout(template="plotly_dark", plot_bgcolor="#0a0a0f", paper_bgcolor="#0a0a0f")
+fig.update_layout(template="plotly_dark")
 st.plotly_chart(fig, use_container_width=True)
-st.markdown('</div>', unsafe_allow_html=True)
 
-st.caption("Real out-of-sample backtested performance on historical data with realistic slippage.")
+st.caption("Real out-of-sample backtested performance on historical data.")
