@@ -1,11 +1,10 @@
 import streamlit as st
+import plotly.express as px
 import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
+from core.backtester import run_real_oos_backtest
 
 st.set_page_config(page_title="Live Alpha Execution Lab", layout="wide")
 
-# CYBERPUNK STYLE
 st.markdown("""
 <style>
     .stApp { background: linear-gradient(135deg, #0a0a0f 0%, #120022 50%, #1a0033 100%); color: #00f5ff; }
@@ -23,27 +22,21 @@ if 'elite_alphas' not in st.session_state or len(st.session_state.elite_alphas) 
 
 alphas = st.session_state.elite_alphas
 
-st.success(f"✅ {len(alphas)} Multi-Factor Alphas Live in Paper Trading")
+st.success(f"Running real OOS backtests on {len(alphas)} alphas...")
 
-# Table with Max Drawdown
-data = []
-for a in alphas:
-    data.append({
-        "name": str(a.get("name", "Alpha"))[:80],
-        "sharpe": float(a.get("sharpe", 3.5)),
-        "persistence": float(a.get("persistence", 0.9)),
-        "oos_return": float(a.get("oos_return", 25)),
-        "max_drawdown": float(a.get("max_drawdown", -15))
-    })
+results = []
+for alpha in alphas:
+    result = run_real_oos_backtest(alpha)
+    results.append(result)
 
-df = pd.DataFrame(data)
-st.dataframe(df, use_container_width=True, hide_index=True)
+df = pd.DataFrame(results)
+st.dataframe(df[['name', 'sharpe', 'persistence', 'oos_return', 'max_drawdown']], use_container_width=True)
 
-# Safe Equity Curve (fixed date range to avoid index errors)
 st.subheader("Combined Portfolio Equity Curve (Real OOS)")
-dates = pd.date_range(end=pd.Timestamp.today(), periods=180)
-equity = np.cumprod(1 + np.random.normal(0.0008, 0.009, 180)) * 1_000_000
-chart_df = pd.DataFrame({"Equity": equity}, index=dates)
-st.line_chart(chart_df, use_container_width=True)
+portfolio = sum(r['equity_curve'] for r in results) / len(results)
+fig = px.line(x=portfolio.index, y=portfolio, title="Portfolio Equity Curve")
+fig.update_traces(line_color='#00ffff', line_width=4)
+fig.update_layout(template="plotly_dark")
+st.plotly_chart(fig, use_container_width=True)
 
-st.caption("Performance is backtested out-of-sample on historical data.")
+st.caption("Performance is real out-of-sample backtested on historical data (yfinance).")
