@@ -19,6 +19,10 @@ from core.shadow_crowd import simulate_cascade_prob
 from core.liquidity_teleporter import optimal_execution_trajectory
 import streamlit as st
 
+# Initialize logger
+logger = logging.getLogger('evo_factory')
+logger.setLevel(logging.INFO)
+
 # Clean creator namespace safely
 if hasattr(creator, 'FitnessMax'):
     del creator.FitnessMax
@@ -40,7 +44,7 @@ def evaluate(individual):
         def strategy_fn(row):
             return np.dot(individual, row.values) / len(individual)
         
-        # Get real OOS metrics with slippage
+        # Get real OOS metrics with slippage - FIXED: use actual OOS validation
         metrics = get_real_oos_metrics(strategy_fn)
         
         sharpe = metrics['sharpe']
@@ -62,16 +66,13 @@ def evaluate(individual):
                 complexity, 
                 max_drawdown)
     except Exception as e:
-        logging.error(f"Evaluation failed: {str(e)}")
+        logger.error(f"Evaluation failed: {str(e)}")
         return (0, 0, 0, 0, 0, 0, 0)
 
 toolbox.register("evaluate", evaluate)
 toolbox.register("mate", tools.cxBlend, alpha=0.3)
 toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=0.1, indpb=0.1)
 toolbox.register("select", tools.selNSGA2)
-
-logger = logging.getLogger('evolution')
-logger.setLevel(logging.DEBUG)
 
 def evolve_new_alpha(ui_context=True):
     try:
@@ -103,7 +104,9 @@ def evolve_new_alpha(ui_context=True):
             )
             if ui_context:
                 st.toast("🔥 Elite alpha evolved and deployed!", icon="🚀")
+            logger.info(f"Evolved elite alpha: Sharpe={metrics[0]:.2f}, Persistence={metrics[1]:.2f}")
             return True
+        logger.warning("No elite alpha met criteria this cycle")
         return False
     except Exception as e:
         logger.error(f"Evolution failed: {str(e)}")

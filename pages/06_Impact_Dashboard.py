@@ -54,17 +54,77 @@ body {
     box-shadow: 0 0 60px #00ff9f, 0 0 100px #00b8ff;
     transform: scale(1.05);
 }
+
+/* NEW HOLOGRAPHIC PANELS */
+.holographic {
+    background: linear-gradient(125deg, rgba(0,243,255,0.1), rgba(255,0,255,0.1));
+    border: 1px solid rgba(0,243,255,0.5);
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 0 50px rgba(0,243,255,0.2);
+    position: relative;
+    overflow: hidden;
+}
+.holographic::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: conic-gradient(transparent, rgba(0,243,255,0.5), transparent 30%);
+    animation: rotate 6s linear infinite;
+    z-index: -1;
+}
+@keyframes rotate {
+    100% { transform: rotate(360deg); }
+}
+
+/* NEURAL NETWORK TRANSITION */
+@keyframes neural {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+.neural-transition {
+    background: linear-gradient(270deg, #00ff9f, #00b8ff, #ff00ff, #6a00ff);
+    background-size: 400% 400%;
+    animation: neural 8s ease infinite;
+    height: 4px;
+    border: none;
+    margin: 1rem 0;
+}
 </style>
 """, unsafe_allow_html=True)
 
 # PROTECT ALL PAGES
 if 'logged_in' not in st.session_state or not st.session_state.logged_in:
     st.switch_page("streamlit_app.py")
+    
 st.title("💰 Moonshot Impact Dashboard")
 st.subheader("Live Portfolio Attribution & Alpha Performance")
 
-alphas = get_top_alphas(30)
-st.dataframe(alphas, use_container_width=True)
+# NEW: Neural transition effect
+st.markdown('<div class="neural-transition"></div>', unsafe_allow_html=True)
 
+# ENHANCED: Add holographic panel
+st.markdown('<div class="holographic">', unsafe_allow_html=True)
 st.metric("Total Simulated Annual P&L Uplift (on $50B AUM)", "$11.4B", "from all 5 weapons combined")
+st.markdown('</div>', unsafe_allow_html=True)
+
+# NEW: Neural transition effect
+st.markdown('<div class="neural-transition"></div>', unsafe_allow_html=True)
+
+# ENHANCED: Add loading state and error handling
+with st.spinner("Loading elite alphas..."):
+    try:
+        alphas = get_top_alphas(30)
+        st.dataframe(alphas, use_container_width=True)
+    except Exception as e:
+        st.error(f"Failed to load alphas: {str(e)}")
+
+# NEW: Neural transition effect
+st.markdown('<div class="neural-transition"></div>', unsafe_allow_html=True)
+
 st.success("You now own the complete groundbreaking quant trading platform that will revolutionise trading forever.")
