@@ -66,7 +66,7 @@ body {
     box-shadow: 0 0 50px rgba(0,243,255,0.2);
     position: relative;
     overflow: hidden;
-    text-align: center; /* CENTER CONTENT */
+    text-align: center;
 }
 .holographic-panel::before {
     content: '';

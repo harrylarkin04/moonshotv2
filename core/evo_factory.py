@@ -18,7 +18,7 @@ from core.omniverse import run_omniverse_sims
 from core.shadow_crowd import simulate_cascade_prob
 from core.liquidity_teleporter import optimal_execution_trajectory
 import streamlit as st
-import traceback  # Added for better error logging
+import traceback
 
 # Initialize logger
 logger = logging.getLogger('evo_factory')
@@ -63,7 +63,22 @@ def evaluate(individual):
         # STRICTER: Penalize low persistence more heavily
         persistence_penalty = 0.3 if persistence < 0.8 else 1.0
         
-        return (sharpe * persistence_penalty, 
+        # ENHANCED: Add regime robustness test
+        omniverse_results = []
+        for scenario in ["Base", "Trump2+China", "AI-CapEx-Crash"]:
+            sim_returns = run_omniverse_sims(scenario, num_sims=100)
+            if not sim_returns.size:
+                continue
+            sim_sharpe = np.mean(sim_returns[-1]) / np.std(sim_returns[-1])
+            omniverse_results.append(sim_sharpe)
+        
+        # Calculate robustness score (min 0.5 penalty for poor scenarios)
+        robustness = 1.0
+        if omniverse_results:
+            min_scenario_sharpe = min(omniverse_results)
+            robustness = max(0.5, min_scenario_sharpe / sharpe) if sharpe > 0 else 0.5
+        
+        return (sharpe * persistence_penalty * robustness, 
                 persistence, 
                 diversity, 
                 consistency, 
@@ -106,7 +121,7 @@ def evolve_new_alpha(ui_context=True):
                 persistence_score=metrics[1],
                 diversity=metrics[2],
                 consistency=metrics[3],
-                auto_deploy=True  # AUTO-DEPLOY ELITE ALPHAS
+                auto_deploy=True
             )
             if ui_context:
                 st.toast("🔥 ELITE alpha evolved and deployed!", icon="🚀")
@@ -115,7 +130,7 @@ def evolve_new_alpha(ui_context=True):
         logger.warning("No elite alpha met criteria this cycle")
         return False
     except Exception as e:
-        logger.error(f"Evolution failed: {str(e)}\n{traceback.format_exc()}")  # Enhanced logging
+        logger.error(f"Evolution failed: {str(e)}\n{traceback.format_exc()}")
         if ui_context:
             st.error(f"Evolution failed: {str(e)}")
         return False

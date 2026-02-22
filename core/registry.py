@@ -3,7 +3,7 @@ import hashlib
 import json
 from datetime import datetime
 import sqlite3
-from core.data_fetcher import get_train_test_data, get_multi_asset_data
+from core.data_fetcher import get_multi_asset_data
 import pandas as pd
 import logging
 
@@ -45,8 +45,8 @@ def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False, 
 def get_real_oos_metrics(strategy_fn):
     """REALISTIC walk-forward validation with volume-adjusted slippage"""
     try:
-        # FIXED: Correct data unpacking
-        full_data = get_multi_asset_data(period="max", include_volume=False)[0]
+        # FIXED: Get both price and volume data
+        full_data, _, volumes = get_multi_asset_data(period="max", include_volume=True)
         
         if full_data.empty:
             logger.error("No data available for OOS validation")
@@ -70,6 +70,7 @@ def get_real_oos_metrics(strategy_fn):
             
         train = full_data.iloc[:split_idx]
         test = full_data.iloc[split_idx:]
+        test_volumes = volumes.iloc[split_idx:] if volumes is not None else None
         
         portfolio_value = 1.0
         peak_value = 1.0
@@ -94,10 +95,14 @@ def get_real_oos_metrics(strategy_fn):
             # Calculate trade size
             trade = target_position - position
             
-            # ENHANCED: Realistic slippage model
-            trade_size = abs(trade)
-            slippage_bp = 5 + 15 * (trade_size / 1_000_000) ** 0.5
-            slippage = slippage_bp / 10000 * trade_size
+            # ENHANCED: Realistic slippage model with volume adjustment
+            slippage_bp = 5
+            if test_volumes is not None:
+                # Calculate volume percentile for more realistic impact
+                volume_percentile = test_volumes.iloc[i].rank(pct=True).mean()
+                slippage_bp += 20 * (1 - volume_percentile)
+            
+            slippage = slippage_bp / 10000 * abs(trade)
             
             # Update position
             position = target_position
