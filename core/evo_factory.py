@@ -6,7 +6,8 @@ import pandas as pd
 import logging
 import json
 import math
-from scipy.spatial.distance import euclidean, pdist, squareform
+from scipy.spatial.distance import euclidean, pdist, squareform, mahalanobis
+from scipy.linalg import inv
 from concurrent.futures import ProcessPoolExecutor
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -27,6 +28,7 @@ logger = logging.getLogger(__name__)
 NOVELTY_ARCHIVE = []
 BEHAVIOR_CHARACTERIZATION = {}
 NOVELTY_DYNAMIC_THRESHOLD = 0.5  # Dynamic threshold for novelty preservation
+COV_MATRIX = None  # For Mahalanobis distance
 
 # Remove existing creator classes to avoid conflicts
 if "FitnessMax" in creator.__dict__:
@@ -58,29 +60,53 @@ def characterize_behavior(individual, returns):
         rsi_signal = (rsi > params[7]).astype(int)
         signals[col] = (sma_signal * 0.6 + rsi_signal * 0.4)
     
-    # Behavioral fingerprint: strategy statistics
+    # Enhanced behavioral fingerprint
     position = signals.rolling(params[5]).mean().diff().fillna(0)
+    turnover = position.diff().abs().mean().mean()
+    vol = returns.std().mean()
+    corr = returns.corrwith(position.shift(1)).mean()
+    
     fingerprint = [
         position.mean().mean(),
         position.std().mean(),
         position.skew().mean(),
         position.kurtosis().mean(),
         (position > 0).mean().mean(),
-        position.autocorr().mean()
+        position.autocorr().mean(),
+        turnover,
+        vol,
+        corr
     ]
     return tuple(fingerprint)
 
 def calculate_novelty(individual, population, archive):
     """Quantum-inspired novelty metric with entanglement"""
+    global COV_MATRIX
     all_points = list(BEHAVIOR_CHARACTERIZATION.values()) + archive
     if len(all_points) < 2:
         return 0.0
     
-    # Calculate distances in behavioral space
-    dist_matrix = squareform(pdist(np.array(all_points)))
-    k = min(15, len(all_points))
+    # Calculate Mahalanobis distance for novelty
+    behaviors = np.array(all_points)
+    if COV_MATRIX is None or COV_MATRIX.shape[0] != behaviors.shape[1]:
+        try:
+            cov = np.cov(behaviors, rowvar=False)
+            COV_MATRIX = inv(cov + np.eye(cov.shape[0]) * 1e-6)
+        except:
+            COV_MATRIX = np.eye(behaviors.shape[1])
+    
     ind_index = list(BEHAVIOR_CHARACTERIZATION.keys()).index(id(individual))
-    distances = dist_matrix[ind_index]
+    target = behaviors[ind_index]
+    distances = []
+    for i, point in enumerate(behaviors):
+        if i != ind_index:
+            try:
+                dist = mahalanobis(target, point, COV_MATRIX)
+                distances.append(dist)
+            except:
+                distances.append(euclidean(target, point))
+    
+    k = min(15, len(distances))
     distances.sort()
     return np.mean(distances[:k])
 
@@ -90,7 +116,7 @@ def calculate_diversity(population):
         return 0.0, np.array([]), np.array([])
     
     # Behavioral diversity
-    behaviors = [BEHAVIOR_CHARACTERIZATION.get(id(ind), np.zeros(6)) for ind in population]
+    behaviors = [BEHAVIOR_CHARACTERIZATION.get(id(ind), np.zeros(9)) for ind in population]
     centroid = np.mean(behaviors, axis=0)
     distances = [euclidean(b, centroid) for b in behaviors]
     diversity_index = np.mean(distances)
@@ -111,6 +137,8 @@ def backtest(individual, returns, fold_count=5):
     
     # Extract parameters
     params = [int(x) for x in individual]
+    if len(params) < 10:
+        params = params + [random.randint(5,200) for _ in range(10-len(params))]
     p1, p2, p3, p4, p5, p6, p7, p8, p9, p10 = params
     
     # Portfolio construction with liquidity constraints
@@ -196,30 +224,48 @@ def backtest(individual, returns, fold_count=5):
     }, all_returns
 
 def test_counterfactual_resilience(individual, returns):
-    """Test strategy resilience under market shocks"""
+    """Test strategy resilience under multiple market shock scenarios"""
     resilience_scores = []
-    for asset in returns.columns[:3]:  # Test top 3 assets
-        try:
-            # Apply 10% negative shock
-            shocked_returns = counterfactual_sim(
-                returns, 
-                shock_asset=asset, 
-                shock_size=-0.1,
-                steps=120
-            )
-            
-            # Backtest on shocked returns
-            metrics, _ = backtest(individual, shocked_returns, fold_count=1)
-            base_metrics, _ = backtest(individual, returns, fold_count=1)
-            
-            # Calculate resilience score
-            sharpe_drop = base_metrics['sharpe'] - metrics['sharpe']
-            resilience = max(0, 1 - abs(sharpe_drop) / max(0.1, base_metrics['sharpe']))
-            resilience_scores.append(resilience)
-        except:
-            resilience_scores.append(0.0)
+    shock_scenarios = [
+        ("negative", -0.1),
+        ("negative", -0.15),
+        ("positive", 0.1),
+        ("volatility", 0.2)
+    ]
     
-    return np.mean(resilience_scores)
+    for scenario in shock_scenarios:
+        shock_type, shock_size = scenario
+        for asset in returns.columns[:3]:  # Test top 3 assets
+            try:
+                # Apply shock based on scenario type
+                if shock_type == "volatility":
+                    # Increase volatility by shock_size
+                    shocked_returns = returns.copy()
+                    shocked_returns[asset] = shocked_returns[asset] * (1 + shock_size)
+                else:
+                    # Price shock
+                    shocked_returns = counterfactual_sim(
+                        returns, 
+                        shock_asset=asset, 
+                        shock_size=shock_size,
+                        steps=120
+                    )
+                
+                # Backtest on shocked returns
+                metrics, _ = backtest(individual, shocked_returns, fold_count=1)
+                base_metrics, _ = backtest(individual, returns, fold_count=1)
+                
+                # Calculate resilience score
+                sharpe_drop = base_metrics['sharpe'] - metrics['sharpe']
+                resilience = max(0, 1 - abs(sharpe_drop) / max(0.1, base_metrics['sharpe']))
+                resilience_scores.append(resilience)
+            except:
+                resilience_scores.append(0.0)
+    
+    # Weighted average with more weight to severe scenarios
+    weights = [1.0, 1.2, 0.8, 1.1]
+    weighted_scores = [s * w for s, w in zip(resilience_scores, weights)]
+    return np.sum(weighted_scores) / np.sum(weights)
 
 def evaluate(individual):
     """Enhanced evaluation with quantum novelty scoring"""
@@ -296,11 +342,12 @@ def init_toolbox():
         f2 = max(ind2.fitness.values[0], 0.01)
         alpha = f1 / (f1 + f2) * (1 + np.random.normal(0, temperature))
         
-        # Entanglement effect - correlated parameters
+        # Enhanced entanglement effect - correlated parameters
         entanglement_mask = [random.random() < 0.3 for _ in range(len(ind1))]
+        entanglement_group = random.sample(range(len(ind1)), k=min(4, len(ind1)//2))
         
         for i in range(len(ind1)):
-            if entanglement_mask[i]:
+            if i in entanglement_group or entanglement_mask[i]:
                 avg = alpha * ind1[i] + (1 - alpha) * ind2[i]
                 ind1[i] = int(avg + random.gauss(0, 0.1))
                 ind2[i] = int(avg + random.gauss(0, 0.1))
@@ -320,6 +367,7 @@ def init_toolbox():
         generation_factor = max(0.5, 1.0 - generation / 100.0)
         mutation_prob *= generation_factor
         
+        # Use diversity to adjust mutation strength
         sigma = 0.1 * (1.0 - min(diversity, 0.8)) + 0.01
         return tools.mutGaussian(individual, mu=0, sigma=sigma, indpb=mutation_prob)
     
@@ -353,9 +401,10 @@ def parallel_evaluate(population):
 def evolve_new_alpha(ui_context=False):
     """Enhanced evolution with quantum novelty preservation"""
     try:
-        global NOVELTY_ARCHIVE, BEHAVIOR_CHARACTERIZATION
+        global NOVELTY_ARCHIVE, BEHAVIOR_CHARACTERIZATION, COV_MATRIX
         NOVELTY_ARCHIVE = []
         BEHAVIOR_CHARACTERIZATION = {}
+        COV_MATRIX = None
         
         is_returns, _ = get_train_test_data()
         hypotheses = swarm_generate_hypotheses(is_returns)
@@ -372,6 +421,7 @@ def evolve_new_alpha(ui_context=False):
             hologram_placeholder = st.empty()
             novelty_placeholder = st.empty()
             resilience_placeholder = st.empty()
+            entanglement_placeholder = st.empty()  # New entanglement visualization
             
             with st.sidebar.expander("⚡ QUANTUM EVOLUTION CONTROLS"):
                 st.session_state.quantum_temp = st.slider("Quantum Temperature", 0.1, 1.0, 0.3, 0.05)
@@ -383,6 +433,7 @@ def evolve_new_alpha(ui_context=False):
                 st.session_state.pop_size = st.slider("Population Size", 500, 2000, 1200, 100)
                 st.session_state.entanglement_strength = st.slider("Entanglement Strength", 0.1, 0.9, 0.3, 0.05)
                 st.session_state.shock_size = st.slider("Resilience Shock Size", -0.3, -0.01, -0.1, 0.01)
+                st.session_state.shock_scenarios_count = st.slider("Shock Scenarios", 1, 5, 4, 1)
         
         init_toolbox()
         pop = toolbox.population(n=st.session_state.pop_size if ui_context else 1200)
@@ -399,6 +450,7 @@ def evolve_new_alpha(ui_context=False):
         novelty_history = []
         resilience_history = []
         best_fitness_history = []
+        entanglement_history = []  # Track entanglement strength
         stagnation_counter = 0
         prev_best = -np.inf
         
@@ -532,6 +584,26 @@ def evolve_new_alpha(ui_context=False):
                         height=300,
                         xaxis_title='Generation',
                         yaxis_title='Resilience',
+                        margin=dict(l=20, r=20, t=50, b=20)
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                # Entanglement visualization
+                with entanglement_placeholder.container():
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(
+                        x=gens, 
+                        y=[st.session_state.quantum_temp for _ in gens],
+                        mode='lines+markers',
+                        line=dict(color='#ff5500', width=3),
+                        name='Quantum Temperature'
+                    ))
+                    fig.update_layout(
+                        title="QUANTUM ENTANGLEMENT EVOLUTION",
+                        template='plotly_dark',
+                        height=300,
+                        xaxis_title='Generation',
+                        yaxis_title='Temperature',
                         margin=dict(l=20, r=20, t=50, b=20)
                     )
                     st.plotly_chart(fig, use_container_width=True)
