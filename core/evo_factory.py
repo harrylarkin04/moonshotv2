@@ -24,7 +24,8 @@ if hasattr(creator, 'FitnessMax'):
 if hasattr(creator, 'Individual'):
     del creator.Individual
 
-creator.create("FitnessMax", base.Fitness, weights=(1.0, 0.5, -0.2, 0.3, 0.4, 0.2, 0.3))
+# IMPROVEMENT: Enhanced fitness weights
+creator.create("FitnessMax", base.Fitness, weights=(1.0, 0.6, -0.3, 0.4, 0.5, 0.3, 0.4))
 creator.create("Individual", list, fitness=creator.FitnessMax)
 
 toolbox = base.Toolbox()
@@ -48,7 +49,16 @@ def evaluate(individual):
     novelty = 0.0
     complexity = len(individual) / 50.0
     
-    return (sharpe, persistence, diversity, consistency, novelty, complexity, max_drawdown)
+    # IMPROVEMENT: Penalize low persistence more heavily
+    persistence_penalty = 0.5 if persistence < 0.7 else 1.0
+    
+    return (sharpe * persistence_penalty, 
+            persistence, 
+            diversity, 
+            consistency, 
+            novelty, 
+            complexity, 
+            max_drawdown)
 
 toolbox.register("evaluate", evaluate)
 toolbox.register("mate", tools.cxBlend, alpha=0.3)
@@ -76,7 +86,8 @@ def evolve_new_alpha(ui_context=True):
         best_ind = tools.selBest(population, 1)[0]
         metrics = evaluate(best_ind)
         
-        if metrics[0] > 3.5 and metrics[1] > 0.8:
+        # IMPROVEMENT: Stricter criteria for elite alphas
+        if metrics[0] > 3.8 and metrics[1] > 0.85:
             save_alpha(
                 name=f"EvolvedAlpha-{hash(tuple(best_ind)) % 1000000}",
                 description="Evolutionary strategy",
