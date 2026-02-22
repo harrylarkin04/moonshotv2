@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 from core.registry import get_top_alphas
 
 st.set_page_config(page_title="MOONSHOT", layout="wide", page_icon="🌑")
@@ -48,7 +49,7 @@ body { background: radial-gradient(circle at 50% 10%, #1a0033 0%, #05050f 70%); 
 </style>
 """, unsafe_allow_html=True)
 
-# ====================== SECURE LOGIN ======================
+# ====================== LOGIN ======================
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
@@ -86,8 +87,7 @@ modules = [
     ("CausalForge Engine", "pages/02_CausalForge_Engine.py"),
     ("Financial Omniverse", "pages/03_Financial_Omniverse.py"),
     ("EvoAlpha Factory", "pages/04_EvoAlpha_Factory.py"),
-    ("Liquidity Teleporter", "pages/05_Liquidity_Teleporter.py"),
-    ("Live Alpha Execution Lab", "pages/07_Live_Alpha_Execution_Lab.py")
+    ("Liquidity Teleporter", "pages/05_Liquidity_Teleporter.py")
 ]
 
 for col, (name, page) in zip(cols, modules):
@@ -95,9 +95,18 @@ for col, (name, page) in zip(cols, modules):
         if st.button(name, use_container_width=True, type="primary", key=name):
             st.switch_page(page)
 
+if st.button("📈 Live Alpha Execution Lab", use_container_width=True, type="primary"):
+    st.switch_page("pages/07_Live_Alpha_Execution_Lab.py")
+
 st.markdown("---")
 st.subheader("Live Alpha Zoo")
-st.dataframe(get_top_alphas(25), use_container_width=True, hide_index=True)
+
+# FIXED: Show real alphas from EvoAlpha Factory
+if 'elite_alphas' in st.session_state and len(st.session_state.elite_alphas) > 0:
+    df = pd.DataFrame(st.session_state.elite_alphas)
+    st.dataframe(df, use_container_width=True, hide_index=True)
+else:
+    st.dataframe(get_top_alphas(25), use_container_width=True, hide_index=True)
 
 if st.button("Refresh Zoo", type="primary"):
     st.rerun()
