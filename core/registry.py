@@ -66,12 +66,20 @@ def get_real_oos_metrics(strategy_fn):
     
     # Calculate metrics
     returns = np.array(returns)
-    sharpe = np.mean(returns) / np.std(returns) * np.sqrt(252) if len(returns) > 1 else 0
-    persistence = len(returns) / 100  # Simplified persistence metric
+    if len(returns) < 2:
+        return {
+            'sharpe': 0,
+            'persistence': 0,
+            'max_drawdown': 0,
+            'period': '2022-01-02_to_2024-06-01'
+        }
+    
+    sharpe = np.mean(returns) / np.std(returns) * np.sqrt(252)
+    persistence = (returns > 0).mean()  # Fraction of positive days
     
     return {
         'sharpe': sharpe,
         'persistence': persistence,
-        'max_drawdown': np.min(1 + np.cumprod(1 + returns)) - 1 if len(returns) > 0 else 0,
+        'max_drawdown': np.min(1 + np.cumprod(1 + returns)) - 1,
         'period': '2022-01-02_to_2024-06-01'
     }

@@ -20,9 +20,9 @@ from core.shadow_crowd import simulate_cascade_prob
 from core.liquidity_teleporter import optimal_execution_trajectory
 
 # Clean creator namespace safely
-if hasattr(creator, 'FitnessMax'):
+if 'FitnessMax' in creator.__dict__:
     del creator.FitnessMax
-if hasattr(creator, 'Individual'):
+if 'Individual' in creator.__dict__:
     del creator.Individual
 
 creator.create("FitnessMax", base.Fitness, weights=(1.0, 0.5, -0.2, 0.3, 0.4, 0.2, 0.3))
