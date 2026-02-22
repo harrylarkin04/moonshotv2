@@ -14,7 +14,7 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.decomposition import PCA
 from core.data_fetcher import get_train_test_data
 from core.registry import save_alpha
-from core.causal_engine import swarm_generate_hypotheses, build_causal_dag
+from core.causal_engine import swarm_generate_hypotheses, build_causal_dag, counterfactual_sim
 from core.omniverse import run_omniverse_sims
 from core.shadow_crowd import simulate_cascade_prob
 from core.liquidity_teleporter import optimal_execution_trajectory
@@ -35,7 +35,7 @@ if "Individual" in creator.__dict__:
     del creator.Individual
 
 # Enhanced fitness with novelty objective
-creator.create("FitnessMax", base.Fitness, weights=(1.0, 0.5, -0.2, 0.3, 0.4))  # Added novelty weight
+creator.create("FitnessMax", base.Fitness, weights=(1.0, 0.5, -0.2, 0.3, 0.4, 0.2))  # Added counterfactual weight
 creator.create("Individual", list, fitness=creator.FitnessMax)
 
 toolbox = base.Toolbox()
@@ -195,6 +195,32 @@ def backtest(individual, returns, fold_count=5):
         'consistency': consistency
     }, all_returns
 
+def test_counterfactual_resilience(individual, returns):
+    """Test strategy resilience under market shocks"""
+    resilience_scores = []
+    for asset in returns.columns[:3]:  # Test top 3 assets
+        try:
+            # Apply 10% negative shock
+            shocked_returns = counterfactual_sim(
+                returns, 
+                shock_asset=asset, 
+                shock_size=-0.1,
+                steps=120
+            )
+            
+            # Backtest on shocked returns
+            metrics, _ = backtest(individual, shocked_returns, fold_count=1)
+            base_metrics, _ = backtest(individual, returns, fold_count=1)
+            
+            # Calculate resilience score
+            sharpe_drop = base_metrics['sharpe'] - metrics['sharpe']
+            resilience = max(0, 1 - abs(sharpe_drop) / max(0.1, base_metrics['sharpe']))
+            resilience_scores.append(resilience)
+        except:
+            resilience_scores.append(0.0)
+    
+    return np.mean(resilience_scores)
+
 def evaluate(individual):
     """Enhanced evaluation with quantum novelty scoring"""
     try:
@@ -212,11 +238,11 @@ def evaluate(individual):
         nn_sharpe = nn.predict(X)[0]
         
         if abs(is_metrics['sharpe'] - nn_sharpe) > 0.5:
-            return 0.0, 0.0, 0.0, 0.0, 0.0
+            return 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
         
         # Full pipeline validation
         if not swarm_generate_hypotheses(is_returns):
-            return 0.0, 0.0, 0.0, 0.0, 0.0
+            return 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
         
         G = build_causal_dag(is_returns)
         causal_score = len(G.edges) / 100
@@ -227,15 +253,19 @@ def evaluate(individual):
         oos_metrics, _ = backtest(individual, oos_returns, fold_count=3)
         overfit_penalty = abs(is_metrics['sharpe'] - oos_metrics['sharpe']) * 0.7
         
+        # Counterfactual resilience testing
+        resilience_score = test_counterfactual_resilience(individual, oos_returns)
+        
         # Composite fitness score with quantum entanglement
         fitness = (
-            oos_metrics['sharpe'] * 0.5 + 
+            oos_metrics['sharpe'] * 0.4 + 
             oos_metrics['sortino'] * 0.15 +
             (1 - abs(oos_metrics['max_drawdown'])) * 0.15 +
             omniverse_score * 0.1 +
             (1 - crowd_risk) * 0.05 -
             overfit_penalty +
-            oos_metrics['consistency'] * 0.1
+            oos_metrics['consistency'] * 0.1 +
+            resilience_score * 0.2
         )
         
         individual.metrics = {
@@ -246,13 +276,14 @@ def evaluate(individual):
             'crowd_risk': crowd_risk,
             'overfit_penalty': overfit_penalty,
             'neural_validation': nn_sharpe,
-            'consistency': oos_metrics['consistency']
+            'consistency': oos_metrics['consistency'],
+            'resilience_score': resilience_score
         }
         
-        return fitness, oos_metrics['consistency'], causal_score, oos_metrics['sortino'], 0.0
+        return fitness, oos_metrics['consistency'], causal_score, oos_metrics['sortino'], 0.0, resilience_score
     except Exception as e:
         logger.error(f"Evaluation failed: {e}")
-        return 0.0, 0.0, 0.0, 0.0, 0.0
+        return 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
 
 def init_toolbox():
     """Initialize with quantum novelty preservation"""
@@ -315,8 +346,8 @@ def parallel_evaluate(population):
             NOVELTY_ARCHIVE.append(BEHAVIOR_CHARACTERIZATION[id(ind)])
     
     # Combine results with novelty
-    for ind, (fit, consistency, causal, sortino, _) in zip(population, results):
-        ind.fitness.values = (fit, consistency, causal, sortino, ind.fitness.novelty)
+    for ind, (fit, consistency, causal, sortino, _, resilience) in zip(population, results):
+        ind.fitness.values = (fit, consistency, causal, sortino, ind.fitness.novelty, resilience)
     return population
 
 def evolve_new_alpha(ui_context=False):
@@ -340,15 +371,18 @@ def evolve_new_alpha(ui_context=False):
             diversity_placeholder = st.empty()
             hologram_placeholder = st.empty()
             novelty_placeholder = st.empty()
+            resilience_placeholder = st.empty()
             
             with st.sidebar.expander("⚡ QUANTUM EVOLUTION CONTROLS"):
                 st.session_state.quantum_temp = st.slider("Quantum Temperature", 0.1, 1.0, 0.3, 0.05)
                 st.session_state.diversity_threshold = st.slider("Diversity Threshold", 0.1, 0.9, 0.4, 0.05)
                 st.session_state.novelty_weight = st.slider("Novelty Weight", 0.1, 1.0, 0.4, 0.05)
+                st.session_state.resilience_weight = st.slider("Resilience Weight", 0.1, 1.0, 0.2, 0.05)
                 st.session_state.neural_validation = st.checkbox("Neural Validation Gate", True)
                 st.session_state.fold_count = st.slider("Validation Folds", 3, 10, 5, 1)
                 st.session_state.pop_size = st.slider("Population Size", 500, 2000, 1200, 100)
                 st.session_state.entanglement_strength = st.slider("Entanglement Strength", 0.1, 0.9, 0.3, 0.05)
+                st.session_state.shock_size = st.slider("Resilience Shock Size", -0.3, -0.01, -0.1, 0.01)
         
         init_toolbox()
         pop = toolbox.population(n=st.session_state.pop_size if ui_context else 1200)
@@ -363,6 +397,7 @@ def evolve_new_alpha(ui_context=False):
         generation_data = []
         diversity_history = []
         novelty_history = []
+        resilience_history = []
         best_fitness_history = []
         stagnation_counter = 0
         prev_best = -np.inf
@@ -378,19 +413,21 @@ def evolve_new_alpha(ui_context=False):
             
             diversity, projection, behaviors = calculate_diversity(pop)
             diversity_history.append(diversity)
-            novelty_history.append(np.mean([ind.fitness.novelty for ind in pop]))
+            novelty_history.append(np.mean([ind.fitness.values[4] for ind in pop]))
+            resilience_history.append(np.mean([ind.fitness.values[5] for ind in pop]))
             
             record = stats.compile(pop)
             current_best = record['max']
             
-            # Stagnation detection
+            # Quantum annealing temperature adjustment
             if current_best <= prev_best + 0.001:
                 stagnation_counter += 1
-                if stagnation_counter > 5:
-                    st.session_state.quantum_temp = min(1.0, st.session_state.quantum_temp + 0.1)
+                if stagnation_counter > 3:
+                    st.session_state.quantum_temp = min(1.0, st.session_state.quantum_temp + 0.15)
                     stagnation_counter = 0
             else:
                 stagnation_counter = 0
+                st.session_state.quantum_temp = max(0.1, st.session_state.quantum_temp - 0.05)
             prev_best = current_best
             
             gen_data = {
@@ -400,6 +437,7 @@ def evolve_new_alpha(ui_context=False):
                 "min_fitness": record['min'],
                 "diversity": diversity,
                 "novelty": np.mean([ind.fitness.novelty for ind in pop]),
+                "resilience": np.mean([ind.fitness.values[5] for ind in pop]),
                 "projection": projection,
                 "behaviors": behaviors,
                 "top_individuals": [ind[:] for ind in tools.selBest(pop, 5)]
@@ -412,7 +450,8 @@ def evolve_new_alpha(ui_context=False):
                 Max Fitness: `{record['max']:.2f}` ⚡  
                 Diversity: `{diversity:.4f}` 🌐  
                 Novelty: `{gen_data['novelty']:.4f}` 🌀  
-                Stagnation: `{stagnation_counter}/5` ⏳  
+                Resilience: `{gen_data['resilience']:.4f}` 🛡️  
+                Stagnation: `{stagnation_counter}/3` ⏳  
                 Elites: `{elite_counter}` 🚀
                 """)
                 
@@ -427,8 +466,8 @@ def evolve_new_alpha(ui_context=False):
                             mode='markers',
                             marker=dict(
                                 size=6,
-                                color=[ind.fitness.values[0] for ind in pop],  # Fitness-based coloring
-                                colorscale='Viridis',
+                                color=[ind.fitness.values[5] for ind in pop],  # Resilience-based coloring
+                                colorscale='Portland',
                                 opacity=0.9,
                                 line=dict(width=1, color='#00f3ff')
                             ),
@@ -454,7 +493,7 @@ def evolve_new_alpha(ui_context=False):
                         scene=dict(
                             xaxis_title='Entanglement Axis 1',
                             yaxis_title='Entanglement Axis 2',
-                            zaxis_title='Novelty Axis'
+                            zaxis_title='Resilience Axis'
                         )
                     )
                     hologram_placeholder.plotly_chart(fig, use_container_width=True)
@@ -474,6 +513,25 @@ def evolve_new_alpha(ui_context=False):
                         height=300,
                         xaxis_title='Generation',
                         yaxis_title='Novelty',
+                        margin=dict(l=20, r=20, t=50, b=20)
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                # Resilience visualization
+                with resilience_placeholder.container():
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(
+                        x=gens, y=resilience_history,
+                        mode='lines+markers',
+                        line=dict(color='#00ff00', width=3),
+                        name='Resilience Score'
+                    ))
+                    fig.update_layout(
+                        title="RESILIENCE EVOLUTION",
+                        template='plotly_dark',
+                        height=300,
+                        xaxis_title='Generation',
+                        yaxis_title='Resilience',
                         margin=dict(l=20, r=20, t=50, b=20)
                     )
                     st.plotly_chart(fig, use_container_width=True)
@@ -514,7 +572,8 @@ def evolve_new_alpha(ui_context=False):
                     metrics.get('overfit_penalty', 1) < 0.2 and
                     diversity > st.session_state.diversity_threshold and
                     metrics.get('consistency', 0) > 0.7 and
-                    best.fitness.values[4] > NOVELTY_DYNAMIC_THRESHOLD):  # Dynamic novelty threshold
+                    best.fitness.values[4] > NOVELTY_DYNAMIC_THRESHOLD and
+                    best.fitness.values[5] > 0.7):  # Added resilience threshold
                     
                     name = f"QuantumAlpha_{random.randint(10000,99999)}"
                     desc = f"{current_hypothesis} – evolved through Quantum Evo v8"
@@ -526,7 +585,8 @@ def evolve_new_alpha(ui_context=False):
                         round(1 - abs(metrics['in_sample']['sharpe'] - oos_metrics['sharpe']), 2),
                         metrics=json.dumps(metrics),
                         diversity=diversity,
-                        novelty=best.fitness.values[4]
+                        novelty=best.fitness.values[4],
+                        resilience=best.fitness.values[5]
                     ):
                         elite_counter += 1
                         if ui_context:
