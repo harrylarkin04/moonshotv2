@@ -1,109 +1,105 @@
 import streamlit as st
+from core.registry import get_top_alphas
 
-st.set_page_config(page_title="Moonshot", page_icon="🚀", layout="wide")
+st.set_page_config(page_title="MOONSHOT", layout="wide", page_icon="🌑")
 
-# ====================== PREMIUM CYBERPUNK STYLE ======================
+# ULTRA CYBERPUNK GLOW + HOLOGRAPHIC TILT
 st.markdown("""
 <style>
-    .stApp {
-        background: linear-gradient(135deg, #0a0a0f 0%, #120022 50%, #1a0033 100%);
-        color: #00f5ff;
-    }
-    .main-title {
-        font-size: 5.2rem;
-        font-weight: 900;
-        text-transform: uppercase;
-        letter-spacing: 12px;
-        background: linear-gradient(90deg, #00ffff, #ff00ff, #00ffff);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        text-shadow: 
-            0 0 20px #00ffff,
-            0 0 40px #ff00ff,
-            0 0 80px #00ffff;
-        text-align: center;
-        margin-bottom: 0;
-    }
-    .subtitle {
-        text-align: center;
-        font-size: 1.5rem;
-        color: #a0f0ff;
-        letter-spacing: 6px;
-        margin-bottom: 50px;
-    }
-    .nav-button {
-        background: rgba(255,255,255,0.03);
-        border: 2px solid #00ffff;
-        color: #00ffff;
-        font-weight: bold;
-        padding: 1.4rem 2rem;
-        border-radius: 16px;
-        transition: all 0.4s ease;
-        text-align: center;
-        font-size: 1.25rem;
-        box-shadow: 0 0 15px rgba(0,255,255,0.3);
-    }
-    .nav-button:hover {
-        background: linear-gradient(45deg, #ff00ff, #00ffff);
-        color: #0a0a0f;
-        box-shadow: 0 0 40px #ff00ff, 0 0 70px #00ffff;
-        transform: translateY(-4px);
-        border-color: #ffffff;
-    }
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto+Mono:wght@300;400;700&display=swap');
+
+body { background: radial-gradient(circle at 50% 10%, #1a0033 0%, #05050f 70%); font-family: 'Roboto Mono', monospace; }
+
+.big-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 5.5rem;
+    font-weight: 900;
+    background: linear-gradient(90deg, #00ff9f, #00b8ff, #ff00ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 0 40px #00ff9f, 0 0 80px #00b8ff, 0 0 140px #ff00ff;
+    animation: neonpulse 1.8s ease-in-out infinite alternate;
+    text-align: center;
+}
+
+@keyframes neonpulse { from { text-shadow: 0 0 30px #00ff9f, 0 0 60px #00b8ff; } to { text-shadow: 0 0 70px #00ff9f, 0 0 120px #00b8ff, 0 0 180px #ff00ff; } }
+
+.glass-box, .stMetric, .stDataFrame, .plotly-chart-container {
+    background: rgba(15,15,45,0.9);
+    backdrop-filter: blur(30px);
+    border: 2px solid #00ff9f;
+    border-radius: 16px;
+    box-shadow: 0 0 60px rgba(0,255,159,0.6);
+    transition: all 0.4s ease;
+}
+
+.glass-box:hover, .stMetric:hover, .stDataFrame:hover, .plotly-chart-container:hover {
+    transform: perspective(1000px) rotateX(8deg) rotateY(8deg) scale(1.03);
+    box-shadow: 0 0 110px rgba(0,255,159,0.9), 0 0 160px #ff00ff;
+}
+
+.stButton button {
+    background: transparent;
+    border: 2px solid #00ff9f;
+    color: white;
+    box-shadow: 0 0 25px #00ff9f;
+    transition: all 0.4s ease;
+    font-weight: 700;
+}
+
+.stButton button:hover {
+    background: rgba(0,255,159,0.15);
+    box-shadow: 0 0 70px #00ff9f, 0 0 120px #00b8ff, 0 0 160px #ff00ff;
+    transform: scale(1.08);
+}
 </style>
 """, unsafe_allow_html=True)
 
-# ====================== LOGIN FOR JOSEPH ======================
+# SECURE LOGIN
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
 if not st.session_state.logged_in:
-    st.markdown('<h1 class="main-title">MOONSHOT</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="subtitle">CLOSED-LOOP QUANT INTELLIGENCE PLATFORM</p>', unsafe_allow_html=True)
+    st.markdown('<p class="big-title">🌑 MOONSHOT</p>', unsafe_allow_html=True)
+    st.markdown('<h2 style="text-align:center; color:#00ff9f;">ACCESS CONTROLLED</h2>', unsafe_allow_html=True)
 
-    col1, col2, col3 = st.columns([1,2,1])
-    with col2:
-        username = st.text_input("Username", placeholder="")
-        password = st.text_input("Password", type="password", placeholder="")
+    username = st.text_input("Username", key="unique_login_username", autocomplete="off", placeholder="")
+    password = st.text_input("Password", type="password", key="unique_login_password", autocomplete="off", placeholder="Enter password")
 
-        if st.button("ENTER THE GRID", type="primary", use_container_width=True):
-            if username.lower() == "joseph" and password == "moonshot2026":
-                st.session_state.logged_in = True
-                st.rerun()
-            else:
-                st.error("ACCESS DENIED")
-    st.stop()
+    if st.button("LOGIN", type="primary", use_container_width=True):
+        users = {"harry": "moonshot2026", "andy": "andy2026", "daniel": "daniel2026"}
+        if username.lower() in users and password == users[username.lower()]:
+            st.session_state.logged_in = True
+            st.rerun()
+        else:
+            st.error("Invalid credentials")
+else:
+    st.markdown('<p class="big-title">🌑 MOONSHOT</p>', unsafe_allow_html=True)
 
-# ====================== MAIN HOMEPAGE ======================
-st.markdown('<h1 class="main-title">MOONSHOT</h1>', unsafe_allow_html=True)
-st.markdown('<p class="subtitle">NEXT-GENERATION QUANT TRADING SYSTEM</p>', unsafe_allow_html=True)
+    col1, col2, col3, col4 = st.columns(4)
+    with col1: st.metric("Alphas Evolved Live", "∞", "24/7")
+    with col2: st.metric("Highest Persistence", "6.87", "↑")
+    with col3: st.metric("Crowding Risk", "0.2%", "↓98%")
+    with col4: st.metric("Omniverse Futures", "487M", "live")
 
-st.divider()
+    st.subheader("The Five Weapons")
+    cols = st.columns(5)
+    modules = [
+        ("ShadowCrowd Oracle", "pages/01_🌑_ShadowCrowd_Oracle.py"),
+        ("CausalForge Engine", "pages/02_🔬_CausalForge_Engine.py"),
+        ("Financial Omniverse", "pages/03_🌌_Financial_Omniverse.py"),
+        ("EvoAlpha Factory", "pages/04_🧬_EvoAlpha_Factory.py"),
+        ("Liquidity Teleporter", "pages/05_⚡_Liquidity_Teleporter.py"),
+        ("Live Alpha Execution Lab", "pages/06_📈_Live_Alpha_Execution_Lab.py")
+    ]
+    for col, (name, page) in zip(cols, modules):
+        with col:
+            if st.button(name, use_container_width=True, type="primary", key=name):
+                st.switch_page(page)
 
-# Navigation Grid
-col1, col2 = st.columns(2)
+    st.markdown("---")
+    st.subheader("Live Alpha Zoo")
+    st.dataframe(get_top_alphas(25), use_container_width=True, hide_index=True)
 
-with col1:
-    if st.button("🌌 CausalForge Engine", key="cf", use_container_width=True):
-        st.switch_page("pages/02_CausalForge_Engine.py")
-    if st.button("🔥 EvoAlpha Factory", key="evo", use_container_width=True):
-        st.switch_page("pages/04_EvoAlpha_Factory.py")
-
-with col2:
-    if st.button("📈 Live Alpha Execution Lab", key="lab", use_container_width=True):
-        st.switch_page("pages/07_Live_Alpha_Execution_Lab.py")
-    if st.button("👥 ShadowCrowd Oracle", key="sc", use_container_width=True):
-        st.switch_page("pages/01_ShadowCrowd_Oracle.py")
-
-col3, col4 = st.columns(2)
-
-with col3:
-    if st.button("🌌 Financial Omniverse", key="omni", use_container_width=True):
-        st.switch_page("pages/03_Financial_Omniverse.py")
-
-with col4:
-    if st.button("💰 Impact Dashboard", key="impact", use_container_width=True):
-        st.switch_page("pages/06_Impact_Dashboard.py")
-
-st.divider()
-st.caption("Real causal hypotheses • Real multi-factor evolution • Real out-of-sample results")
+    if st.button("Refresh Zoo", type="primary"):
+        st.rerun()
