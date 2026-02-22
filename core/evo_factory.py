@@ -52,7 +52,11 @@ def evaluate(individual):
         max_drawdown = metrics['max_drawdown']
         diversity = 1 - max_drawdown
         consistency = (sharpe > 0) * persistence
-        novelty = 0.0
+        
+        # ENHANCED: Novelty detection using population distance
+        pop_distances = [euclidean(individual, ind) for ind in toolbox.population(n=10)]
+        novelty = np.mean(pop_distances)
+        
         complexity = len(individual) / 50.0
         
         # IMPROVEMENT: Penalize low persistence more heavily

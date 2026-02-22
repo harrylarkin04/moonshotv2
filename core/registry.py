@@ -66,8 +66,16 @@ def get_real_oos_metrics(strategy_fn):
         peak_value = 1.0
         max_drawdown = 0.0
         
-        # IMPROVED: Dynamic ADV calculation
-        ADV = test.mean().mean() * 1_000_000  # More realistic volume
+        # FIXED: Correct ADV calculation using volume data
+        # IMPROVEMENT: Use actual volume data instead of mean price
+        _, volume_data = get_multi_asset_data(period="max", include_volume=True)
+        if volume_data is None:
+            ADV = 1_000_000  # Fallback value
+        else:
+            test_volumes = volume_data.loc[split_date:]
+            ADV = test_volumes.mean().mean()
+        
+        position = 0.0  # Track current position
         
         for i in range(1, len(test)):
             row = test.iloc[i]
@@ -75,16 +83,22 @@ def get_real_oos_metrics(strategy_fn):
             
             asset_returns = (row / prev_row - 1).values
             signal = strategy_fn(prev_row)
-            target_position = signal * 1.0
+            
+            # Calculate target position
+            target_position = signal * portfolio_value
             
             # Calculate trade size
-            trade = target_position - (portfolio_value - 1.0)  # Position change
+            trade = target_position - position
             
             # ENHANCED: Volume-adjusted slippage model (5bp base + size impact)
             trade_size = abs(trade)
             slippage_bp = 5 + 20 * (trade_size / (0.1 * ADV)) ** 0.5
             slippage = slippage_bp / 10000 * trade_size
             
+            # Update position
+            position = target_position
+            
+            # Calculate return after slippage
             executed_return = np.dot(asset_returns, target_position) - slippage
             
             # Update portfolio metrics
