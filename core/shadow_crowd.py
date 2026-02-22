@@ -6,7 +6,7 @@ from core.data_fetcher import get_multi_asset_data
 
 def build_exposure_graph():
     from core.data_fetcher import get_multi_asset_data
-    corr = returns.corr()
+    returns = get_multi_asset_data(period="1y")
     G = nx.Graph()
     for col in corr.columns:
         G.add_node(col, title=col, size=35)

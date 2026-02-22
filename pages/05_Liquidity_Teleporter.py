@@ -196,6 +196,5 @@ if st.button("Teleport Position – Zero Footprint Execution", type="primary"):
             </div>
             """, unsafe_allow_html=True)
         
-        st.success("**Insane value:** Lets a $100B+ fund trade like a $10B fund with zero footprint. Massive increase in capacity + new alpha from flow capture. Easily $2-5B+ annual edge on execution alone for large players.")
+        st.success("**Value:** Lets a $100B+ fund trade like a $10B fund with zero footprint. Massive increase in capacity + new alpha from flow capture. Easily $2-5B+ annual edge on execution alone for large players.")
 
-st.info("These aren't sci-fi — the building blocks all exist in 2026 at research scale. Integrating them with proprietary data moats is the moat.")

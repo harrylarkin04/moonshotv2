@@ -132,7 +132,12 @@ st.markdown("**Problem it obliterates:** 99% of \"signals\" are just correlated 
 
 st.markdown("**How the tool works:** An autonomous swarm of LLM agents (fine-tuned on the entire economics/finance corpus + your proprietary data) generates causal hypotheses, then tests them at scale using next-gen causal discovery (neural causal graphs + PCMCI++ extensions + continuous-time structural equation models) across all your data streams (tick, alt, text, images). Outputs fully explainable causal DAGs with interventional/counterfactual simulators (\"what happens to returns if we shock X while holding Y?\"). Every alpha comes with a \"persistence score\" and automatic regime-robust version.")
 
-_, returns = get_multi_asset_data(period="2y")
+if 'returns' not in st.session_state:
+    from core.data_fetcher import get_multi_asset_data
+    returns = get_multi_asset_data(period="2y")
+    st.session_state.returns = returns
+else:
+    returns = st.session_state.returns
 
 if st.button("🧠 Activate Autonomous LLM Swarm (5 agents)", type="primary"):
     with st.spinner("Swarm generating causal hypotheses..."):
