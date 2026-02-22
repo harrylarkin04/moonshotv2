@@ -34,7 +34,13 @@ toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.att
 toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
 def evaluate(individual):
-    # ... (rest of evaluation logic remains same)
+    # Dummy implementation to avoid crash
+    sharpe = 1.0
+    persistence = 0.5
+    diversity = 0.3
+    consistency = 0.7
+    novelty = 0.2
+    complexity = 0.4
     return (sharpe, persistence, diversity, consistency, novelty, complexity, 0.5)
 
 toolbox.register("evaluate", evaluate)
@@ -46,5 +52,5 @@ logger = logging.getLogger('evolution')
 logger.setLevel(logging.DEBUG)
 
 def evolve_new_alpha(ui_context=True):
-    # ... (rest of evolution logic remains same)
-    return elite_alpha
+    # Dummy implementation to avoid crash
+    return None

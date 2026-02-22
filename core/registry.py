@@ -1,3 +1,13 @@
+import numpy as np
+import hashlib
+import json
+from datetime import datetime
+import sqlite3
+from core.data_fetcher import get_train_test_data, get_multi_asset_data
+
+# Create database connection
+conn = sqlite3.connect('alphas.db')
+
 def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False, metrics=None, diversity=0.0, consistency=0.0):
     try:
         if sharpe > 3.5 and persistence_score > 0.8 and diversity > 0.3 and consistency > 0.7:
