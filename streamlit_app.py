@@ -89,13 +89,10 @@ body {
     transform: scale(1.05);
 }
 
-/* AGGRESSIVE KILL FOR USERNAME SUGGESTIONS */
+/* REMOVED USERNAME SUGGESTIONS */
 input[type="text"][autocomplete="off"],
 input[type="text"][name="username"],
-input[type="text"][id="unique_login_username"],
-input[type="text"][placeholder*="harry"],
-input[type="text"][placeholder*="andy"],
-input[type="text"][placeholder*="daniel"] {
+input[type="text"][id="unique_login_username"] {
     -webkit-text-fill-color: #fff !important;
     background: rgba(0,0,0,0.7) !important;
     border: 1px solid #00ff9f !important;
@@ -185,8 +182,8 @@ if not st.session_state.logged_in:
 
     with st.container():
         st.markdown('<div class="holographic">', unsafe_allow_html=True)
-        username = st.text_input("Username", key="unique_login_username", autocomplete="off", placeholder="harry / andy / daniel")
-        password = st.text_input("Password", type="password", key="unique_login_password", autocomplete="off", placeholder="Enter password")
+        username = st.text_input("Username", key="unique_login_username", autocomplete="off")
+        password = st.text_input("Password", type="password", key="unique_login_password", autocomplete="off")
         st.markdown('</div>', unsafe_allow_html=True)
 
     if st.button("LOGIN", type="primary", use_container_width=True):
@@ -194,7 +191,8 @@ if not st.session_state.logged_in:
         users = {
             "harry": "c29tZXNlY3JldA==",  # moonshot2026
             "andy": "YW5keTIwMjY=",      # andy2026
-            "daniel": "ZGFuaWVsMjAyNg=="  # daniel2026
+            "daniel": "ZGFuaWVsMjAyNg==",  # daniel2026
+            "joseph": "bW9vbnNob3QyMDI2"  # moonshot2026
         }
         import base64
         valid = False
@@ -219,12 +217,12 @@ else:
     st.subheader("The Six Weapons")  # FIXED: Updated from Five to Six
     cols = st.columns(6)
     modules = [
-        ("ShadowCrowd Oracle", "pages/01_🌑_ShadowCrowd_Oracle.py"),
-        ("CausalForge Engine", "pages/02_🔬_CausalForge_Engine.py"),
-        ("Financial Omniverse", "pages/03_🌌_Financial_Omniverse.py"),
-        ("EvoAlpha Foundry", "pages/04_🧬_EvoAlpha_Factory.py"),
-        ("Liquidity Teleporter", "pages/05_⚡_Liquidity_Teleporter.py"),
-        ("Live Alpha Execution Lab", "pages/06_📈_Live_Alpha_Execution_Lab.py")
+        ("ShadowCrowd Oracle", "pages/01_ShadowCrowd_Oracle.py"),
+        ("CausalForge Engine", "pages/02_CausalForge_Engine.py"),
+        ("Financial Omniverse", "pages/03_Financial_Omniverse.py"),
+        ("EvoAlpha Foundry", "pages/04_EvoAlpha_Factory.py"),
+        ("Liquidity Teleporter", "pages/05_Liquidity_Teleporter.py"),
+        ("Live Alpha Execution Lab", "pages/06_Impact_Dashboard.py")
     ]
     for col, (name, page) in zip(cols, modules):
         with col:
