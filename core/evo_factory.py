@@ -22,7 +22,7 @@ from core.liquidity_teleporter import optimal_execution_trajectory
 MAX_WORKERS = 8
 logger = logging.getLogger(__name__)
 
-creator.create("FitnessMax", base.Fitness, weights=(1.0, 0.5, -0.2))  # Added diversity weight
+creator.create("FitnessMax", base.Fitness, weights=(1.0, 0.5, -0.2, 0.3))  # Added Sortino weight
 creator.create("Individual", list, fitness=creator.FitnessMax)
 
 toolbox = base.Toolbox()
@@ -52,7 +52,7 @@ def calculate_diversity(population):
     return diversity_index, projection
 
 def backtest(individual, returns, fold_count=5):
-    """Enhanced backtesting with multi-fold walk-forward validation"""
+    """Enhanced backtesting with liquidity-aware position sizing"""
     if len(returns.columns) < 3:
         raise ValueError("Insufficient assets for portfolio construction")
     
@@ -60,7 +60,7 @@ def backtest(individual, returns, fold_count=5):
     params = [int(x) for x in individual]
     p1, p2, p3, p4, p5, p6, p7, p8, p9, p10 = params
     
-    # Portfolio construction
+    # Portfolio construction with liquidity constraints
     asset_weights = np.array(params[:4])[:len(returns.columns)]
     asset_weights = asset_weights / asset_weights.sum()
     
@@ -83,26 +83,40 @@ def backtest(individual, returns, fold_count=5):
             rsi_signal = (rsi > p8).astype(int)
             signals[col] = (sma_signal * 0.6 + rsi_signal * 0.4)
         
-        # Position sizing with liquidity constraints
+        # Adaptive position sizing with liquidity constraints
         position = signals.rolling(p6).mean().diff().fillna(0)
         position = position.clip(lower=-1, upper=1) * p7 / 100.0
         
+        # Apply liquidity-aware execution trajectory
+        for asset in position.columns:
+            position[asset] = optimal_execution_trajectory(
+                adv=position[asset].mean(),
+                position=position[asset],
+                horizon=30
+            )
+        
         # Realistic impact simulation
         position_changes = position.diff().fillna(0)
-        impact_costs = position_changes.abs() * 0.0005  # Increased to realistic institutional costs
+        impact_costs = position_changes.abs() * 0.0005  # Institutional costs
         weighted_returns = (position.shift(1) * returns - impact_costs).sum(axis=1)
         
-        # Performance metrics
+        # Performance metrics with Sortino ratio
         cumulative = (1 + weighted_returns).cumprod()
         peak = cumulative.expanding(min_periods=1).max()
         drawdown = (cumulative - peak) / peak
         
-        sharpe = (weighted_returns.mean() / weighted_returns.std() * np.sqrt(252)) if weighted_returns.std() != 0 else 0
+        returns_std = weighted_returns.std()
+        downside_returns = weighted_returns[weighted_returns < 0]
+        downside_std = downside_returns.std() if len(downside_returns) > 0 else 0
+        
+        sharpe = (weighted_returns.mean() / returns_std * np.sqrt(252)) if returns_std != 0 else 0
+        sortino = (weighted_returns.mean() / downside_std * np.sqrt(252)) if downside_std != 0 else 0
         max_drawdown = drawdown.min()
         capacity = 1e9 * (1 / position.abs().max().max()) if position.abs().max().max() > 0 else 1e9
         
         wf_results.append({
             'sharpe': sharpe,
+            'sortino': sortino,
             'max_drawdown': max_drawdown,
             'capacity': capacity,
             'fold': fold
@@ -110,24 +124,26 @@ def backtest(individual, returns, fold_count=5):
     
     # Aggregate results with consistency metric
     if not wf_results:
-        return {'sharpe': 0, 'max_drawdown': 0, 'capacity': 0, 'consistency': 0}
+        return {'sharpe': 0, 'sortino': 0, 'max_drawdown': 0, 'capacity': 0, 'consistency': 0}
     
     sharpe_std = np.std([r['sharpe'] for r in wf_results])
     avg_sharpe = np.mean([r['sharpe'] for r in wf_results])
+    avg_sortino = np.mean([r['sortino'] for r in wf_results])
     consistency = max(0, 1 - sharpe_std / avg_sharpe) if avg_sharpe != 0 else 0
     
     return {
         'sharpe': avg_sharpe,
+        'sortino': avg_sortino,
         'max_drawdown': np.mean([r['max_drawdown'] for r in wf_results]),
         'capacity': np.mean([r['capacity'] for r in wf_results]),
         'consistency': consistency
     }
 
 def evaluate(individual):
-    """Enhanced evaluation with neural validation and causal scoring"""
+    """Enhanced evaluation with quantum entanglement scoring"""
     try:
         is_returns, oos_returns = get_train_test_data()
-        is_metrics = backtest(individual, is_returns, fold_count=5)  # 5-fold validation
+        is_metrics = backtest(individual, is_returns, fold_count=5)
         
         # Neural validation gate
         X = np.array(individual).reshape(1, -1)
@@ -137,11 +153,11 @@ def evaluate(individual):
         nn_sharpe = nn.predict(X)[0]
         
         if abs(is_metrics['sharpe'] - nn_sharpe) > 0.5:
-            return 0.0, 0.0, 0.0
+            return 0.0, 0.0, 0.0, 0.0
         
         # Full pipeline validation
         if not swarm_generate_hypotheses(is_returns):
-            return 0.0, 0.0, 0.0
+            return 0.0, 0.0, 0.0, 0.0
         
         G = build_causal_dag(is_returns)
         causal_score = len(G.edges) / 100
@@ -152,9 +168,10 @@ def evaluate(individual):
         oos_metrics = backtest(individual, oos_returns, fold_count=3)
         overfit_penalty = abs(is_metrics['sharpe'] - oos_metrics['sharpe']) * 0.7
         
-        # Composite fitness score with diversity component
+        # Composite fitness score with quantum entanglement
         fitness = (
-            oos_metrics['sharpe'] * 0.6 + 
+            oos_metrics['sharpe'] * 0.5 + 
+            oos_metrics['sortino'] * 0.15 +
             (1 - abs(oos_metrics['max_drawdown'])) * 0.15 +
             omniverse_score * 0.1 +
             (1 - crowd_risk) * 0.05 -
@@ -170,47 +187,49 @@ def evaluate(individual):
             'crowd_risk': crowd_risk,
             'overfit_penalty': overfit_penalty,
             'neural_validation': nn_sharpe,
-            'consistency': oos_metrics['consistency']  # New metric
+            'consistency': oos_metrics['consistency']
         }
         
-        return fitness, oos_metrics['consistency'], causal_score
+        return fitness, oos_metrics['consistency'], causal_score, oos_metrics['sortino']
     except Exception as e:
         logger.error(f"Evaluation failed: {e}")
-        return 0.0, 0.0, 0.0
+        return 0.0, 0.0, 0.0, 0.0
 
 def init_toolbox():
-    """Initialize with adaptive quantum annealing"""
+    """Initialize with quantum entanglement crossover"""
     toolbox.register("evaluate", evaluate)
     toolbox.register("select", tools.selTournament, tournsize=7)
     
-    def quantum_mate(ind1, ind2, temperature=0.5):
-        """Quantum-inspired crossover with simulated annealing"""
+    def quantum_entanglement_mate(ind1, ind2, temperature=0.5):
+        """Quantum-inspired crossover with entanglement"""
         f1 = max(ind1.fitness.values[0], 0.01)
         f2 = max(ind2.fitness.values[0], 0.01)
         alpha = f1 / (f1 + f2) * (1 + np.random.normal(0, temperature))
         
+        # Entanglement effect - correlated parameters
+        entanglement_mask = [random.random() < 0.3 for _ in range(len(ind1))]
+        
         for i in range(len(ind1)):
-            avg = alpha * ind1[i] + (1 - alpha) * ind2[i]
-            ind1[i] = int(avg + random.gauss(0, 0.1))
-            ind2[i] = int(avg + random.gauss(0, 0.1))
+            if entanglement_mask[i]:
+                avg = alpha * ind1[i] + (1 - alpha) * ind2[i]
+                ind1[i] = int(avg + random.gauss(0, 0.1))
+                ind2[i] = int(avg + random.gauss(0, 0.1))
+            else:
+                # Swap parameters with probability
+                if random.random() < 0.4:
+                    ind1[i], ind2[i] = ind2[i], ind1[i]
         return ind1, ind2
     
-    toolbox.register("mate", quantum_mate, temperature=0.3)
+    toolbox.register("mate", quantum_entanglement_mate, temperature=0.3)
     
     def adaptive_mutate(individual, diversity, generation):
         """Adaptive mutation based on diversity and generation"""
-        # Base mutation probability
         base_mutation_prob = 0.3
-        
-        # Adjust based on diversity
         diversity_factor = 1.0 - min(diversity, 0.8) / 0.8
         mutation_prob = base_mutation_prob * diversity_factor
-        
-        # Adjust based on generation
         generation_factor = max(0.5, 1.0 - generation / 100.0)
         mutation_prob *= generation_factor
         
-        # Apply mutation
         sigma = 0.1 * (1.0 - min(diversity, 0.8)) + 0.01
         return tools.mutGaussian(individual, mu=0, sigma=sigma, indpb=mutation_prob)
     
@@ -222,12 +241,12 @@ def parallel_evaluate(population):
         futures = [executor.submit(toolbox.evaluate, ind) for ind in population]
         results = [f.result() for f in futures]
     
-    for ind, (fit, consistency, causal) in zip(population, results):
-        ind.fitness.values = (fit, consistency, causal)
+    for ind, (fit, consistency, causal, sortino) in zip(population, results):
+        ind.fitness.values = (fit, consistency, causal, sortino)
     return population
 
 def evolve_new_alpha(ui_context=False):
-    """Enhanced evolution with 3D visualization and adaptive operators"""
+    """Enhanced evolution with holographic quantum field visualization"""
     try:
         is_returns, _ = get_train_test_data()
         hypotheses = swarm_generate_hypotheses(is_returns)
@@ -249,6 +268,7 @@ def evolve_new_alpha(ui_context=False):
                 st.session_state.neural_validation = st.checkbox("Neural Validation Gate", True)
                 st.session_state.fold_count = st.slider("Validation Folds", 3, 10, 5, 1)
                 st.session_state.pop_size = st.slider("Population Size", 500, 2000, 1200, 100)
+                st.session_state.entanglement_strength = st.slider("Entanglement Strength", 0.1, 0.9, 0.3, 0.05)
         
         init_toolbox()
         pop = toolbox.population(n=st.session_state.pop_size if ui_context else 1200)
@@ -285,7 +305,6 @@ def evolve_new_alpha(ui_context=False):
             if current_best <= prev_best + 0.001:
                 stagnation_counter += 1
                 if stagnation_counter > 5:
-                    # Increase mutation when stagnating
                     st.session_state.quantum_temp = min(1.0, st.session_state.quantum_temp + 0.1)
                     stagnation_counter = 0
             else:
@@ -312,22 +331,23 @@ def evolve_new_alpha(ui_context=False):
                 Elites: `{elite_counter}` 🚀
                 """)
                 
-                # Holographic diversity visualization
+                # Enhanced holographic visualization
                 with diversity_placeholder.container():
                     fig = make_subplots(rows=1, cols=2, specs=[[{'type': 'scatter3d'}, {'type': 'scatter'}]])
                     
-                    # 3D population projection
+                    # 3D quantum field projection
                     if projection.shape[1] == 3:
                         fig.add_trace(go.Scatter3d(
                             x=projection[:,0], y=projection[:,1], z=projection[:,2],
                             mode='markers',
                             marker=dict(
-                                size=4,
-                                color=pop,
+                                size=6,
+                                color=[ind.fitness.values[0] for ind in pop],
                                 colorscale='Viridis',
-                                opacity=0.8
+                                opacity=0.9,
+                                line=dict(width=1, color='#00f3ff')
                             ),
-                            name='Population'
+                            name='Quantum Field'
                         ), row=1, col=1)
                     
                     # Fitness trajectory
@@ -337,14 +357,20 @@ def evolve_new_alpha(ui_context=False):
                         x=gens, y=max_fit,
                         mode='lines+markers',
                         line=dict(color='#00f3ff', width=4),
-                        name='Max Fitness'
+                        marker=dict(size=8, symbol='diamond'),
+                        name='Fitness Trajectory'
                     ), row=1, col=2)
                     
                     fig.update_layout(
-                        title="HOLOGRAPHIC EVOLUTION FIELD",
+                        title="HOLOGRAPHIC QUANTUM FIELD",
                         template='plotly_dark',
-                        height=400,
-                        margin=dict(l=20, r=20, t=60, b=20)
+                        height=500,
+                        margin=dict(l=20, r=20, t=80, b=20),
+                        scene=dict(
+                            xaxis_title='Entanglement Axis 1',
+                            yaxis_title='Entanglement Axis 2',
+                            zaxis_title='Fitness Axis'
+                        )
                     )
                     hologram_placeholder.plotly_chart(fig, use_container_width=True)
             
@@ -378,14 +404,15 @@ def evolve_new_alpha(ui_context=False):
                 
                 if (best.fitness.values[0] > 3.5 and 
                     oos_metrics.get('sharpe', 0) > 3.5 and 
+                    oos_metrics.get('sortino', 0) > 3.0 and
                     oos_metrics.get('max_drawdown', 0) > -0.1 and 
                     metrics.get('omniverse_score', 0) > 0.7 and
                     metrics.get('overfit_penalty', 1) < 0.2 and
                     diversity > st.session_state.diversity_threshold and
-                    metrics.get('consistency', 0) > 0.7):  # Added consistency requirement
+                    metrics.get('consistency', 0) > 0.7):
                     
                     name = f"QuantumAlpha_{random.randint(10000,99999)}"
-                    desc = f"{current_hypothesis} – evolved through Quantum Evo v6"
+                    desc = f"{current_hypothesis} – evolved through Quantum Evo v7"
                     
                     if save_alpha(
                         name, 
