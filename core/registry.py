@@ -6,12 +6,40 @@ import sqlite3
 from core.data_fetcher import get_multi_asset_data
 import pandas as pd
 import logging
+import os
 
 # Initialize logger
 logger = logging.getLogger('registry')
 logger.setLevel(logging.INFO)
 
-conn = sqlite3.connect('alphas.db', check_same_thread=False)
+# Create database directory if needed
+os.makedirs('data', exist_ok=True)
+conn = sqlite3.connect('data/alphas.db', check_same_thread=False)
+
+def init_db():
+    """Initialize database with proper table structure"""
+    try:
+        with conn:
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS alphas (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                description TEXT,
+                sharpe REAL,
+                persistence_score REAL,
+                created TEXT,
+                live_paper_trading INTEGER DEFAULT 0,
+                oos_metrics TEXT,
+                diversity REAL,
+                consistency REAL
+            )
+            """)
+        logger.info("Database initialized")
+    except Exception as e:
+        logger.error(f"DB initialization failed: {str(e)}")
+
+# Initialize database on import
+init_db()
 
 def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False, metrics=None, diversity=0.0, consistency=0.0):
     try:

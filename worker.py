@@ -1,19 +1,23 @@
 import time
 import logging
 from core.evo_factory import evolve_new_alpha
-import traceback  # Added for better error logging
+import traceback
 
+# Configure logging
 logging.basicConfig(
     filename='logs/worker.log', 
     level=logging.INFO, 
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     filemode='a'
 )
-
 logger = logging.getLogger('evolution_worker')
 
 print("🌑 MOONSHOT v3 EVOLUTIONARY WORKER STARTED")
 print("🔥 1200+ strategy population • 50 generations • Elite selection only")
+
+# Ensure logs directory exists
+import os
+os.makedirs('logs', exist_ok=True)
 
 while True:
     try:

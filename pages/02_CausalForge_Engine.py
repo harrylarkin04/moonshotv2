@@ -109,6 +109,15 @@ body {
     font-size: 0.9rem;
     color: #00f3ff;
 }
+
+/* NEW: Interactive node glow */
+.node-glow {
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+.node-glow:hover {
+    filter: drop-shadow(0 0 10px #00ff9f);
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -127,22 +136,28 @@ _, returns = get_multi_asset_data(period="2y")
 
 if st.button("🧠 Activate Autonomous LLM Swarm (5 agents)", type="primary"):
     with st.spinner("Swarm generating causal hypotheses..."):
-        hyps = swarm_generate_hypotheses(returns)
-        for h in hyps:
-            st.write("→ " + h)
+        try:
+            hyps = swarm_generate_hypotheses(returns)
+            for h in hyps:
+                st.write("→ " + h)
+        except Exception as e:
+            st.error(f"Hypothesis generation failed: {str(e)}")
 
 if st.button("🔬 Build & Visualize Neural Causal DAG"):
     with st.spinner("Running next-gen causal discovery..."):
-        G = build_causal_dag(returns)
-        visualize_dag(G)
-        st.session_state.causal_dag = G  # Store for interaction
-        st.success("Fully explainable causal DAG generated + persistence scores attached.")
+        try:
+            G = build_causal_dag(returns)
+            visualize_dag(G)
+            st.session_state.causal_dag = G  # Store for interaction
+            st.success("Fully explainable causal DAG generated + persistence scores attached.")
+        except Exception as e:
+            st.error(f"DAG construction failed: {str(e)}")
 
 # ENHANCED: Interactive node selection
 if 'causal_dag' in st.session_state and st.session_state.causal_dag:
     st.subheader("Interactive Causal Analysis")
     nodes = list(st.session_state.causal_dag.nodes())
-    selected_node = st.selectbox("Select node for details", nodes, index=0)
+    selected_node = st.selectbox("Select node for details", nodes, index=0, key="node_select")
     
     # Display node metrics in holographic cards
     node_data = st.session_state.causal_dag.nodes[selected_node]
@@ -150,7 +165,7 @@ if 'causal_dag' in st.session_state and st.session_state.causal_dag:
     
     with col1:
         st.markdown(f"""
-        <div class="metric-card">
+        <div class="metric-card node-glow">
             <div class="metric-value">{node_data.get('persistence', 0.0):.2f}</div>
             <div class="metric-label">PERSISTENCE SCORE</div>
         </div>
@@ -158,7 +173,7 @@ if 'causal_dag' in st.session_state and st.session_state.causal_dag:
     
     with col2:
         st.markdown(f"""
-        <div class="metric-card">
+        <div class="metric-card node-glow">
             <div class="metric-value">{node_data.get('influence', 0.0):.2f}</div>
             <div class="metric-label">CAUSAL INFLUENCE</div>
         </div>
@@ -166,30 +181,36 @@ if 'causal_dag' in st.session_state and st.session_state.causal_dag:
 
 st.subheader("Interventional / Counterfactual Simulator")
 st.markdown('<div class="holographic">', unsafe_allow_html=True)
-assets = returns.columns.tolist()
+assets = returns.columns.tolist() if not returns.empty else []
 col1, col2, col3 = st.columns(3)
 with col1:
-    shock_asset = st.selectbox("Asset to shock", assets, index=0)
+    shock_asset = st.selectbox("Asset to shock", assets, index=0, key="shock_asset")
 with col2:
-    shock_size = st.slider("Shock size (% daily return)", -15.0, 15.0, 3.0)
+    shock_size = st.slider("Shock size (% daily return)", -15.0, 15.0, 3.0, key="shock_size")
 with col3:
-    horizon = st.slider("Simulation horizon (days)", 30, 365, 120)
+    horizon = st.slider("Simulation horizon (days)", 30, 365, 120, key="horizon")
 st.markdown('</div>', unsafe_allow_html=True)
 
-if st.button("Run What-If Simulation"):
-    sim = counterfactual_sim(returns, shock_asset, shock_size/100, steps=horizon)
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(y=sim.mean(axis=1), name="Shocked Path (counterfactual)", line=dict(color='#00ff9f', width=3)))
-    fig.add_trace(go.Scatter(y=returns.iloc[-len(sim):].mean(axis=1).cumsum() + 100, name="Baseline", line=dict(color='#ff00ff', width=3)))
-    fig.update_layout(
-        title="Counterfactual Simulation",
-        template='plotly_dark',
-        xaxis_title="Days",
-        yaxis_title="Cumulative Return",
-        hovermode="x unified",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-    )
-    st.plotly_chart(fig, use_container_width=True)
-    st.metric("Persistence Score of This Edge", "0.94", "Regime-robust version auto-generated")
+if st.button("Run What-If Simulation", key="simulate_btn"):
+    if not returns.empty:
+        try:
+            sim = counterfactual_sim(returns, shock_asset, shock_size/100, steps=horizon)
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(y=sim.mean(axis=1), name="Shocked Path (counterfactual)", line=dict(color='#00ff9f', width=3)))
+            fig.add_trace(go.Scatter(y=returns.iloc[-len(sim):].mean(axis=1).cumsum() + 100, name="Baseline", line=dict(color='#ff00ff', width=3)))
+            fig.update_layout(
+                title="Counterfactual Simulation",
+                template='plotly_dark',
+                xaxis_title="Days",
+                yaxis_title="Cumulative Return",
+                hovermode="x unified",
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            st.metric("Persistence Score of This Edge", "0.94", "Regime-robust version auto-generated")
+        except Exception as e:
+            st.error(f"Simulation failed: {str(e)}")
+    else:
+        st.warning("No data available for simulation")
 
 st.info("**Insane value:** Generates truly novel, non-crowded, regulator-proof alphas... +3-7% annualized persistent edge... Worth billions because it turns \"alpha is dead\" into \"we print new causal edges faster than others can copy.\"")
