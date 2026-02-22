@@ -5,7 +5,6 @@ plotly
 pyvis
 networkx
 yfinance
-statsmodels
 deap==3.0.1
 scipy
 openai

@@ -35,21 +35,28 @@ def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False, 
         return False
 
 def get_real_oos_metrics(strategy_fn):
-    """Walk-forward validation with real historical data and 5bp slippage"""
+    """Real walk-forward validation with historical data and 5bp slippage"""
     full_data, _ = get_multi_asset_data(period="max")
+    
+    # Use actual historical dates for walk-forward validation
     train = full_data.loc[:'2022-01-01']
-    test = full_data.loc['2022-01-02':]
+    test = full_data.loc['2022-01-02':'2024-06-01']
+    
+    if test.empty:
+        return {
+            'sharpe': 0,
+            'persistence': 0,
+            'max_drawdown': 0,
+            'period': '2022-01-02_to_2024-06-01'
+        }
     
     returns = []
     current_position = 0
-    for i in range(len(test)):
-        if i == 0:
-            continue  # Skip first row
-        
+    for i in range(1, len(test)):
         row = test.iloc[i]
         prev_row = test.iloc[i-1]
         
-        # Calculate returns
+        # Calculate actual asset returns from historical data
         asset_returns = (row / prev_row - 1).values
         
         # Get signal from strategy
@@ -58,8 +65,8 @@ def get_real_oos_metrics(strategy_fn):
         trade = target_position - current_position
         
         # Apply 5bp slippage (0.0005 = 5 basis points)
-        slippage = 0.0005 * np.sign(trade) if trade != 0 else 0
-        executed_return = np.dot(asset_returns, target_position) - abs(slippage)
+        slippage = 0.0005 * abs(trade) if trade != 0 else 0
+        executed_return = np.dot(asset_returns, target_position) - slippage
         
         returns.append(executed_return)
         current_position = target_position
@@ -81,7 +88,7 @@ def get_real_oos_metrics(strategy_fn):
     cumulative = np.cumprod(1 + returns)
     peak = cumulative.max()
     trough = cumulative.min()
-    max_drawdown = (trough - peak) / peak
+    max_drawdown = (trough - peak) / peak if peak != 0 else 0
     
     return {
         'sharpe': sharpe,
