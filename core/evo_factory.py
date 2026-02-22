@@ -7,7 +7,7 @@ import logging
 import json
 import math
 from concurrent.futures import ProcessPoolExecutor
-import plotly.graph_objects as go  # Added missing import
+import plotly.graph_objects as go
 from core.data_fetcher import get_train_test_data
 from core.registry import save_alpha
 from core.causal_engine import swarm_generate_hypotheses, build_causal_dag
@@ -24,7 +24,7 @@ creator.create("Individual", list, fitness=creator.FitnessMax)
 
 toolbox = base.Toolbox()
 toolbox.register("attr_int", random.randint, 5, 200)
-toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_int, n=10)  # Increased parameters
+toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_int, n=10)
 toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
 def backtest(individual, returns):
@@ -129,15 +129,15 @@ def evaluate(individual):
         # Out-of-sample validation
         oos_metrics = backtest(individual, oos_returns)
         
-        # Calculate overfitting penalty
-        overfit_penalty = abs(is_metrics['sharpe'] - oos_metrics['sharpe']) * 0.5
+        # Calculate overfitting penalty (lower tolerance)
+        overfit_penalty = abs(is_metrics['sharpe'] - oos_metrics['sharpe']) * 0.7
         
-        # Composite fitness score with strict criteria
+        # Composite fitness score with stricter criteria
         fitness = (
-            oos_metrics['sharpe'] * 0.6 + 
-            (1 - abs(oos_metrics['max_drawdown'])) * 0.2 +
+            oos_metrics['sharpe'] * 0.7 + 
+            (1 - abs(oos_metrics['max_drawdown'])) * 0.15 +
             omniverse_score * 0.1 +
-            (1 - crowd_risk) * 0.1 -
+            (1 - crowd_risk) * 0.05 -
             overfit_penalty
         )
         
@@ -344,7 +344,7 @@ def evolve_new_alpha(ui_context=False):
             # Replace population (elites + offspring)
             pop[:] = elites + offspring
             
-            # Auto-deploy elite performers with strict criteria
+            # Auto-deploy elite performers with stricter criteria
             for best in hof:
                 metrics = getattr(best, 'metrics', {})
                 oos_metrics = metrics.get('out_of_sample', {})
@@ -353,7 +353,7 @@ def evolve_new_alpha(ui_context=False):
                     oos_metrics.get('sharpe', 0) > 3.5 and 
                     oos_metrics.get('max_drawdown', 0) > -0.1 and 
                     metrics.get('omniverse_score', 0) > 0.7 and
-                    metrics.get('overfit_penalty', 1) < 0.3):  # Low overfitting
+                    metrics.get('overfit_penalty', 1) < 0.2):  # Lower overfit tolerance
                     
                     name = f"EvoAlpha_{random.randint(10000,99999)}"
                     desc = f"{current_hypothesis} – evolved through Moonshot v4"
