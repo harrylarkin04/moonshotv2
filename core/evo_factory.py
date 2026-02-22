@@ -6,6 +6,7 @@ import pandas as pd
 import logging
 import json
 import math
+from scipy.spatial.distance import hamming
 from concurrent.futures import ProcessPoolExecutor
 import plotly.graph_objects as go
 from core.data_fetcher import get_train_test_data
@@ -26,6 +27,20 @@ toolbox = base.Toolbox()
 toolbox.register("attr_int", random.randint, 5, 200)
 toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_int, n=10)
 toolbox.register("population", tools.initRepeat, list, toolbox.individual)
+
+def calculate_diversity(population):
+    """Calculate population diversity using Hamming distance"""
+    if len(population) < 2:
+        return 0.0
+    
+    total_distance = 0.0
+    count = 0
+    for i in range(len(population)):
+        for j in range(i+1, len(population)):
+            total_distance += hamming(population[i], population[j]) * len(population[i])
+            count += 1
+    
+    return total_distance / count if count > 0 else 0.0
 
 def backtest(individual, returns):
     """Advanced backtesting with multi-asset support and walk-forward validation"""
@@ -177,10 +192,10 @@ def init_toolbox():
     toolbox.register("mate", fitness_cx)
     
     # Enhanced fitness-aware mutation
-    def adaptive_mutate(individual):
-        # Base parameters
-        base_mutation_prob = 0.5
-        base_sigma = 0.1
+    def adaptive_mutate(individual, diversity=0.5):
+        # Base parameters with diversity scaling
+        base_mutation_prob = 0.5 * (1.0 - min(diversity, 0.8))  # Higher mutation when diversity low
+        base_sigma = 0.1 * (1.0 + (1.0 - diversity))  # Larger steps when diversity low
         
         if hasattr(individual, 'fitness') and individual.fitness.valid:
             fitness = individual.fitness.values[0]
@@ -223,8 +238,14 @@ def evolve_new_alpha(ui_context=False):
             elite_count = st.empty()
             metrics_display = st.empty()
             live_stats = st.empty()
+            diversity_placeholder = st.empty()
             # Add placeholder for 3D visualization
             viz_placeholder = st.empty()
+            
+            # Add mutation controls
+            with st.sidebar.expander("⚙️ EVOLUTION CONTROLS"):
+                st.session_state.base_mut_rate = st.slider("Base Mutation Rate", 0.1, 1.0, 0.5, 0.05)
+                st.session_state.diversity_threshold = st.slider("Diversity Threshold", 0.1, 0.9, 0.3, 0.05)
         
         init_toolbox()
         pop = toolbox.population(n=1200)
@@ -239,6 +260,8 @@ def evolve_new_alpha(ui_context=False):
         
         # Data collection for visualization
         generation_data = []
+        diversity_data = []
+        mutation_data = []
         
         elite_counter = 0
         for gen in range(50):
@@ -250,6 +273,10 @@ def evolve_new_alpha(ui_context=False):
             pop = parallel_evaluate(pop)
             hof.update(pop)
             
+            # Calculate diversity
+            diversity = calculate_diversity(pop)
+            diversity_data.append(diversity)
+            
             # Record and display stats
             record = stats.compile(pop)
             
@@ -259,7 +286,7 @@ def evolve_new_alpha(ui_context=False):
                 "avg_fitness": record['avg'],
                 "max_fitness": record['max'],
                 "min_fitness": record['min'],
-                "diversity": record['std'],
+                "diversity": diversity,
                 "top_individuals": [ind[:] for ind in tools.selBest(pop, 5)]
             }
             generation_data.append(gen_data)
@@ -270,8 +297,28 @@ def evolve_new_alpha(ui_context=False):
                 Avg Fitness: `{record['avg']:.2f}`  
                 Max Fitness: `{record['max']:.2f}`  
                 Min Fitness: `{record['min']:.2f}`  
-                Diversity: `{record['std']:.4f}`
+                Diversity: `{diversity:.4f}`
                 """)
+                
+                # Create diversity plot
+                with diversity_placeholder.container():
+                    st.subheader("POPULATION DIVERSITY")
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(
+                        x=list(range(1, gen+2)),
+                        y=diversity_data,
+                        mode='lines+markers',
+                        line=dict(color='#00f3ff', width=4),
+                        name='Diversity'
+                    ))
+                    fig.update_layout(
+                        xaxis_title='Generation',
+                        yaxis_title='Diversity (Hamming Distance)',
+                        template='plotly_dark',
+                        height=300,
+                        margin=dict(l=20, r=20, t=40, b=20)
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
                 
                 # Create 3D visualization
                 if gen > 0:  # Wait until we have at least 2 generations
@@ -331,10 +378,10 @@ def evolve_new_alpha(ui_context=False):
                     del child1.fitness.values
                     del child2.fitness.values
             
-            # Adaptive mutation
+            # Adaptive mutation with diversity awareness
             for mutant in offspring:
                 if random.random() < 0.5:  # Higher mutation rate
-                    toolbox.mutate(mutant)
+                    toolbox.mutate(mutant, diversity=diversity)
                     del mutant.fitness.values
             
             # Evaluate new individuals

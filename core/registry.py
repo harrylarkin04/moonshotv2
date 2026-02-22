@@ -19,7 +19,8 @@ conn.execute('''CREATE TABLE IF NOT EXISTS alphas (
     persistence_score REAL,
     created TEXT,
     live_paper_trading INTEGER DEFAULT 0,
-    oos_metrics TEXT DEFAULT '{}'
+    oos_metrics TEXT DEFAULT '{}',
+    diversity REAL DEFAULT 0.0  # NEW: Store diversity metric
 )''')
 conn.commit()
 
@@ -40,7 +41,7 @@ if pd.read_sql_query("SELECT COUNT(*) FROM alphas", conn).iloc[0,0] == 0:
             pass
     conn.commit()
 
-def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False, metrics=None):
+def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False, metrics=None, diversity=0.0):
     """Save only elite alphas meeting strict criteria with full metrics"""
     try:
         if sharpe > 3.5 and persistence_score > 0.8:
@@ -50,12 +51,13 @@ def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False, 
                 'sharpe': sharpe,
                 'persistence': persistence_score,
                 'hash': strategy_hash,
-                'full_metrics': json.loads(metrics) if metrics else {}
+                'full_metrics': json.loads(metrics) if metrics else {},
+                'diversity': diversity  # NEW: Store diversity metric
             }
             
-            conn.execute("INSERT INTO alphas (name, description, sharpe, persistence_score, created, live_paper_trading, oos_metrics) VALUES (?,?,?,?,?,?,?)",
+            conn.execute("INSERT INTO alphas (name, description, sharpe, persistence_score, created, live_paper_trading, oos_metrics, diversity) VALUES (?,?,?,?,?,?,?,?)",
                          (name, description, sharpe, persistence_score, datetime.now().isoformat(), 
-                          1 if auto_deploy else 0, json.dumps(oos_metrics)))
+                          1 if auto_deploy else 0, json.dumps(oos_metrics), diversity))
             conn.commit()
             return True
         return False
@@ -67,7 +69,7 @@ def get_top_alphas(n=20):
     """Get top alphas with live trading performance and cyberpunk status"""
     try:
         df = pd.read_sql_query(f"""
-            SELECT name, description, sharpe, persistence_score, live_paper_trading, created, oos_metrics 
+            SELECT name, description, sharpe, persistence_score, live_paper_trading, created, oos_metrics, diversity 
             FROM alphas 
             WHERE sharpe > 3.5 AND persistence_score > 0.8
             ORDER BY sharpe DESC 

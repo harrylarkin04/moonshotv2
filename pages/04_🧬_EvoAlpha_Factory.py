@@ -54,6 +54,14 @@ st.markdown("""
     background: linear-gradient(90deg, #6a00ff, #00f3ff);
     border-radius: 10px;
 }
+.diversity-panel {
+    background: linear-gradient(135deg, rgba(106,0,255,0.2), rgba(0,243,255,0.2));
+    border: 1px solid rgba(0,243,255,0.5);
+    border-radius: 12px;
+    padding: 1rem;
+    margin: 1rem 0;
+    box-shadow: 0 0 30px rgba(0,243,255,0.3);
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -65,6 +73,7 @@ st.markdown("""
         <span class="metric-badge">SHARPE >3.5</span>
         <span class="metric-badge">DRAWDOWN <10%</span>
         <span class="metric-badge">CAPACITY >$1B</span>
+        <span class="metric-badge">DIVERSITY >0.3</span>  <!-- NEW METRIC -->
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -83,6 +92,19 @@ st.markdown(f"""
 <div class="evolve-container" style="padding:1rem; margin-top:1rem">
     <h3>ACTIVE HYPOTHESIS</h3>
     <p style="font-size:1.1rem; color:#00f3ff">🔮 {st.session_state.current_hypothesis}</p>
+</div>
+""", unsafe_allow_html=True)
+
+# Add diversity info panel
+st.markdown("""
+<div class="diversity-panel">
+    <h4 style="color:#00f3ff; text-align:center">POPULATION DIVERSITY</h4>
+    <p style="text-align:center">Higher diversity = stronger evolutionary pressure</p>
+    <div style="display:flex; justify-content:center; gap:1rem">
+        <div class="metric-badge">LOW <0.2</div>
+        <div class="metric-badge">MEDIUM 0.2-0.4</div>
+        <div class="metric-badge">HIGH >0.4</div>
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -107,6 +129,8 @@ if not top_alphas.empty:
         with col1:
             st.markdown(f"**{row['name']}**")
             st.caption(row['description'])
+            # NEW: Display diversity metric
+            st.markdown(f"**Diversity:** `{row.get('diversity', 0.0):.3f}`")
         with col2:
             # Sharpe progress
             sharpe_pct = min(row['sharpe'] / 5.0, 1.0)

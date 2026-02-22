@@ -64,7 +64,7 @@ body {
 }
 
 .stDataFrame {
-    text-align: center !important;
+    text-align: center!important;
 }
 
 .stDataFrame th, .stDataFrame td {
