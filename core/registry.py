@@ -72,7 +72,8 @@ def get_real_oos_metrics(strategy_fn):
         portfolio_value *= (1 + executed_return)
         peak_value = max(peak_value, portfolio_value)
         current_drawdown = (portfolio_value - peak_value) / peak_value
-        max_drawdown = min(max_drawdown, current_drawdown)
+        if current_drawdown < max_drawdown:
+            max_drawdown = current_drawdown
         
         returns.append(executed_return)
         current_position = target_position
@@ -86,7 +87,9 @@ def get_real_oos_metrics(strategy_fn):
         }
     
     returns = np.array(returns)
-    sharpe = np.mean(returns) / np.std(returns) * np.sqrt(252)
+    ann_ret = np.mean(returns) * 252
+    ann_vol = np.std(returns) * np.sqrt(252)
+    sharpe = ann_ret / ann_vol if ann_vol > 0 else 0
     
     # FIXED: Correct persistence calculation
     positive_months = len([r for r in returns if r > 0])
@@ -95,6 +98,6 @@ def get_real_oos_metrics(strategy_fn):
     return {
         'sharpe': sharpe,
         'persistence': persistence,
-        'max_drawdown': max_drawdown,
+        'max_drawdown': abs(max_drawdown),
         'period': '2022-01-02_to_2024-06-01'
     }

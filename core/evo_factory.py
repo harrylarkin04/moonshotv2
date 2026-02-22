@@ -34,31 +34,35 @@ toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.att
 toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
 def evaluate(individual):
-    # Convert individual to trading strategy function
-    def strategy_fn(row):
-        return np.dot(individual, row.values) / len(individual)
-    
-    # Get real OOS metrics with slippage
-    metrics = get_real_oos_metrics(strategy_fn)
-    
-    sharpe = metrics['sharpe']
-    persistence = metrics['persistence']
-    max_drawdown = metrics['max_drawdown']
-    diversity = 1 - max_drawdown
-    consistency = (sharpe > 0) * persistence
-    novelty = 0.0
-    complexity = len(individual) / 50.0
-    
-    # IMPROVEMENT: Penalize low persistence more heavily
-    persistence_penalty = 0.5 if persistence < 0.7 else 1.0
-    
-    return (sharpe * persistence_penalty, 
-            persistence, 
-            diversity, 
-            consistency, 
-            novelty, 
-            complexity, 
-            max_drawdown)
+    try:
+        # Convert individual to trading strategy function
+        def strategy_fn(row):
+            return np.dot(individual, row.values) / len(individual)
+        
+        # Get real OOS metrics with slippage
+        metrics = get_real_oos_metrics(strategy_fn)
+        
+        sharpe = metrics['sharpe']
+        persistence = metrics['persistence']
+        max_drawdown = metrics['max_drawdown']
+        diversity = 1 - max_drawdown
+        consistency = (sharpe > 0) * persistence
+        novelty = 0.0
+        complexity = len(individual) / 50.0
+        
+        # IMPROVEMENT: Penalize low persistence more heavily
+        persistence_penalty = 0.5 if persistence < 0.7 else 1.0
+        
+        return (sharpe * persistence_penalty, 
+                persistence, 
+                diversity, 
+                consistency, 
+                novelty, 
+                complexity, 
+                max_drawdown)
+    except Exception as e:
+        logging.error(f"Evaluation failed: {str(e)}")
+        return (0, 0, 0, 0, 0, 0, 0)
 
 toolbox.register("evaluate", evaluate)
 toolbox.register("mate", tools.cxBlend, alpha=0.3)

@@ -2,6 +2,7 @@ import streamlit as st
 from core.registry import get_top_alphas
 from core.evo_factory import evolve_new_alpha
 import time
+import base64
 
 st.set_page_config(page_title="MOONSHOT", layout="wide", page_icon="🌑", initial_sidebar_state="collapsed")
 
@@ -182,8 +183,11 @@ if not st.session_state.logged_in:
     st.markdown('<p class="big-title glitch" style="text-align:center">🌑 MOONSHOT</p>', unsafe_allow_html=True)
     st.markdown('<h2 style="text-align:center; color:#00ff9f;">ACCESS CONTROLLED</h2>', unsafe_allow_html=True)
 
-    username = st.text_input("Username", key="unique_login_username", autocomplete="off", placeholder="harry / andy / daniel")
-    password = st.text_input("Password", type="password", key="unique_login_password", autocomplete="off", placeholder="Enter password")
+    with st.container():
+        st.markdown('<div class="holographic">', unsafe_allow_html=True)
+        username = st.text_input("Username", key="unique_login_username", autocomplete="off", placeholder="harry / andy / daniel")
+        password = st.text_input("Password", type="password", key="unique_login_password", autocomplete="off", placeholder="Enter password")
+        st.markdown('</div>', unsafe_allow_html=True)
 
     if st.button("LOGIN", type="primary", use_container_width=True):
         # Encrypted credentials

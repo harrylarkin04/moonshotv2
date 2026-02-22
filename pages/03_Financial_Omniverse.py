@@ -74,9 +74,19 @@ scenario = st.selectbox("Choose extreme future scenario", ["Base", "Trump2+China
 if st.button("Generate 8,000 Omniverse Futures", type="primary"):
     with st.spinner("Running millions of counterfactual world-model simulations..."):
         paths = run_omniverse_sims(scenario)
-        if not paths.empty:
+        if paths.size > 0:
             fig = px.line(paths[:400].T, title=f"Omniverse – {scenario} Regime Futures")
+            fig.update_layout(
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font_color='#00ff9f',
+                xaxis_title="Days",
+                yaxis_title="Cumulative Return",
+                legend_title="Simulation Path"
+            )
             st.plotly_chart(fig, use_container_width=True)
             st.success("**Insane value:** Discover strategies that work in regimes that don't exist yet. Portfolio optimization and risk models that are actually robust. One fund using this could have sidestepped the entire 2025 quant wobble... $5B+ in avoided losses + new strategy discovery per year. This is the holy grail — whoever has the best Omniverse basically has a time machine for markets.")
         else:
-            st.error("Failed to generate Omniverse futures")
+            st.error("Failed to generate Omniverse futures. Please try again later.")
+
+st.info("These aren't sci-fi — the building blocks all exist in 2026 at research scale. Integrating them with proprietary data moats is the moat.")
