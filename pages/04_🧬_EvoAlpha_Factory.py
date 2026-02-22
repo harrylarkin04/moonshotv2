@@ -62,6 +62,30 @@ st.markdown("""
     margin: 1rem 0;
     box-shadow: 0 0 30px rgba(0,243,255,0.3);
 }
+.holographic-viz {
+    background: linear-gradient(135deg, rgba(0,243,255,0.1), rgba(106,0,255,0.1));
+    border: 1px solid rgba(0,243,255,0.5);
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+    box-shadow: 0 0 50px rgba(0,243,255,0.2);
+    position: relative;
+    overflow: hidden;
+}
+.holographic-viz::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: conic-gradient(transparent, rgba(0,243,255,0.5), transparent 30%);
+    animation: rotate 6s linear infinite;
+    z-index: -1;
+}
+@keyframes rotate {
+    100% { transform: rotate(360deg); }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -73,7 +97,7 @@ st.markdown("""
         <span class="metric-badge">SHARPE >3.5</span>
         <span class="metric-badge">DRAWDOWN <10%</span>
         <span class="metric-badge">CAPACITY >$1B</span>
-        <span class="metric-badge">DIVERSITY >0.3</span>  <!-- NEW METRIC -->
+        <span class="metric-badge">DIVERSITY >0.3</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -120,7 +144,7 @@ if st.button("⚡ IGNITE EVOLUTIONARY FOUNDRY", type="primary", use_container_wi
         else:
             result_placeholder.warning("⚠️ Evolution completed - no elite alphas met strict criteria")
 
-st.subheader("ELITE STRATEGY ZOO (Sharpe >3.5 | Persistence >0.8 | Drawdown <10%)")
+st.subheader("ELITE STRATEGY ZOO (Sharpe >3.5 | Persistence >0.8 | Drawdown <10% | Diversity >0.3)")
 top_alphas = get_top_alphas(25)
 if not top_alphas.empty:
     # Enhanced display with progress bars
@@ -129,7 +153,7 @@ if not top_alphas.empty:
         with col1:
             st.markdown(f"**{row['name']}**")
             st.caption(row['description'])
-            # NEW: Display diversity metric
+            # Display diversity metric
             st.markdown(f"**Diversity:** `{row.get('diversity', 0.0):.3f}`")
         with col2:
             # Sharpe progress
@@ -163,6 +187,12 @@ if not top_alphas.empty:
 else:
     st.warning("No elite strategies found")
 
-# Placeholder for holographic visualization will be filled during evolution
+# Holographic visualization placeholder
 st.subheader("EVOLUTIONARY PERFORMANCE")
+st.markdown("""
+<div class="holographic-viz">
+    <h4 style="color:#00f3ff; text-align:center">HOLOGRAPHIC EVOLUTIONARY TRAJECTORY</h4>
+    <p style="text-align:center">3D visualization will appear during evolution</p>
+</div>
+""", unsafe_allow_html=True)
 viz_placeholder = st.empty()

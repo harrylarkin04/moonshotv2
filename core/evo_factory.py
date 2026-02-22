@@ -396,11 +396,13 @@ def evolve_new_alpha(ui_context=False):
                 metrics = getattr(best, 'metrics', {})
                 oos_metrics = metrics.get('out_of_sample', {})
                 
+                # ADD DIVERSITY THRESHOLD TO ELITE CRITERIA
                 if (best.fitness.values[0] > 3.5 and 
                     oos_metrics.get('sharpe', 0) > 3.5 and 
                     oos_metrics.get('max_drawdown', 0) > -0.1 and 
                     metrics.get('omniverse_score', 0) > 0.7 and
-                    metrics.get('overfit_penalty', 1) < 0.2):  # Lower overfit tolerance
+                    metrics.get('overfit_penalty', 1) < 0.2 and
+                    diversity > 0.3):  # NEW: Diversity threshold
                     
                     name = f"EvoAlpha_{random.randint(10000,99999)}"
                     desc = f"{current_hypothesis} – evolved through Moonshot v4"
@@ -411,7 +413,8 @@ def evolve_new_alpha(ui_context=False):
                         desc, 
                         round(oos_metrics['sharpe'], 2), 
                         round(1 - abs(metrics['in_sample']['sharpe'] - oos_metrics['sharpe']), 2),
-                        metrics=json.dumps(metrics)
+                        metrics=json.dumps(metrics),
+                        diversity=diversity  # NEW: Pass diversity metric
                     ):
                         elite_counter += 1
                         if ui_context:
