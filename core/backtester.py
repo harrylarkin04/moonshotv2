@@ -27,7 +27,7 @@ def run_real_oos_backtest(alpha, symbol="SPY", period="3y", oos_months=6):
     equity = (1 + strategy_returns).cumprod() * 100000
 
     total_return = (equity.iloc[-1] / equity.iloc[0] - 1) * 100 if len(equity) > 1 else 0.0
-    sharpe = (strategy_returns.mean() / strategy_returns.std()) * np.sqrt(252) if strategy_returns.std() != 0 else 0.0
+    sharpe = (strategy_returns.mean() / strategy_returns.std()) * np.sqrt(252) if strategy_returns.std() > 1e-10 else 0.0
     max_dd = ((equity / equity.cummax()) - 1).min() * 100 if len(equity) > 1 else 0.0
 
     return {
