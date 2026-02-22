@@ -2,7 +2,7 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 import json
-from core.registry import get_top_alphas
+from core.registry import get_top_alphas, create_performance_plots
 from core.data_fetcher import get_multi_asset_data
 
 st.markdown("""
@@ -129,6 +129,22 @@ for _, alpha in alphas.iterrows():
                 <div class="metric-label">CONSISTENCY</div>
             </div>
             """.format(alpha['consistency']), unsafe_allow_html=True)
+        
+        # NEW: Performance charts
+        returns_series = metrics.get('returns_series', [])
+        if returns_series:
+            equity_fig, drawdown_fig, monthly_fig = create_performance_plots(returns_series)
+            
+            if equity_fig and drawdown_fig and monthly_fig:
+                st.markdown("<div class='holo-divider'></div>", unsafe_allow_html=True)
+                st.subheader("Performance Analysis")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.plotly_chart(equity_fig, use_container_width=True)
+                with col2:
+                    st.plotly_chart(drawdown_fig, use_container_width=True)
+                st.plotly_chart(monthly_fig, use_container_width=True)
         
         # IMPROVEMENT: OOS metrics with period info
         if metrics:

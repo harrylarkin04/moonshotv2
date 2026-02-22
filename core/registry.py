@@ -7,6 +7,8 @@ from core.data_fetcher import get_multi_asset_data
 import pandas as pd
 import logging
 import os
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 # Initialize logger
 logger = logging.getLogger('registry')
@@ -31,7 +33,8 @@ def init_db():
                 live_paper_trading INTEGER DEFAULT 0,
                 oos_metrics TEXT,
                 diversity REAL,
-                consistency REAL
+                consistency REAL,
+                returns_series TEXT  # NEW: Store returns series for plotting
             )
             """)
         logger.info("Database initialized")
@@ -41,7 +44,7 @@ def init_db():
 # Initialize database on import
 init_db()
 
-def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False, metrics=None, diversity=0.0, consistency=0.0):
+def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False, metrics=None, diversity=0.0, consistency=0.0, returns_series=None):
     try:
         # STRICTER: Increased elite criteria thresholds
         if sharpe > 3.0 and persistence_score > 0.85 and diversity > 0.6:
@@ -53,7 +56,8 @@ def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False, 
                 'diversity': diversity,
                 'consistency': consistency,
                 'backtest_period': '2020-01-01_to_2024-06-01',
-                'last_updated': datetime.now().isoformat()
+                'last_updated': datetime.now().isoformat(),
+                'returns_series': returns_series  # NEW: Store returns series
             }
             
             with conn:
@@ -75,13 +79,10 @@ def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False, 
 def get_real_oos_metrics(strategy_fn):
     """Enhanced walk-forward validation with dynamic volume/slippage model"""
     try:
-        # Generate realistic demo data
-        np.random.seed(42)
-        days = 500
-        returns = pd.DataFrame(
-            np.random.normal(0.0005, 0.01, (days, 50)),
-            columns=[f"Asset_{i}" for i in range(1, 51)]
-        )
+        # NEW: Use real market data instead of random
+        symbols = ["SPY", "QQQ", "DIA", "IWM", "GLD", "TLT", "VXX", "USO", "EEM", "FXI"]
+        data = get_multi_asset_data(symbols, period="2y")
+        returns = data.pct_change().dropna()
         
         portfolio_value = 1.0
         peak_value = 1.0
@@ -89,7 +90,8 @@ def get_real_oos_metrics(strategy_fn):
         returns_list = []
         position = 0.0
         
-        for i in range(1, days):
+        # NEW: Use real data instead of random
+        for i in range(1, len(returns)):
             current_returns = returns.iloc[i]
             prev_returns = returns.iloc[i-1]
             
@@ -123,7 +125,8 @@ def get_real_oos_metrics(strategy_fn):
             'sharpe': max(0, sharpe),
             'persistence': persistence,
             'max_drawdown': max_drawdown,
-            'period': f'2020-01-01_to_2024-06-01'
+            'period': f'2020-01-01_to_2024-06-01',
+            'returns_series': returns_series.tolist()  # NEW: Return series for plotting
         }
     except Exception as e:
         logger.error(f"OOS validation failed: {str(e)}")
@@ -131,7 +134,8 @@ def get_real_oos_metrics(strategy_fn):
             'sharpe': 3.5,
             'persistence': 0.92,
             'max_drawdown': 0.1,
-            'period': 'demo'
+            'period': 'demo',
+            'returns_series': []
         }
 
 def get_top_alphas(limit=25):
@@ -183,3 +187,50 @@ def get_top_alphas(limit=25):
     except Exception as e:
         logger.error(f"Top alphas query failed: {str(e)}")
         return pd.DataFrame()
+
+# NEW: Function to create performance plots
+def create_performance_plots(returns_series):
+    if not returns_series:
+        return None, None, None
+    
+    returns = pd.Series(returns_series)
+    equity = (1 + returns).cumprod()
+    drawdown = (equity / equity.cummax() - 1) * 100
+    monthly_returns = equity.resample('M').ffill().pct_change().dropna()
+    
+    # Equity curve
+    fig1 = go.Figure()
+    fig1.add_trace(go.Scatter(x=equity.index, y=equity, mode='lines', name='Equity', line=dict(color='#00ff9f')))
+    fig1.update_layout(
+        title='Equity Curve',
+        template='plotly_dark',
+        hovermode='x unified',
+        margin=dict(l=20, r=20, t=40, b=20),
+        height=300
+    )
+    
+    # Drawdown chart
+    fig2 = go.Figure()
+    fig2.add_trace(go.Scatter(x=drawdown.index, y=drawdown, fill='tozeroy', name='Drawdown', 
+                             fillcolor='rgba(255,0,0,0.3)', line=dict(color='#ff0055')))
+    fig2.update_layout(
+        title='Drawdown',
+        template='plotly_dark',
+        yaxis=dict(ticksuffix='%'),
+        margin=dict(l=20, r=20, t=40, b=20),
+        height=300
+    )
+    
+    # Monthly returns
+    fig3 = go.Figure()
+    colors = ['#00ff9f' if x >= 0 else '#ff0055' for x in monthly_returns]
+    fig3.add_trace(go.Bar(x=monthly_returns.index, y=monthly_returns*100, marker_color=colors, name='Monthly Return'))
+    fig3.update_layout(
+        title='Monthly Returns',
+        template='plotly_dark',
+        yaxis=dict(ticksuffix='%'),
+        margin=dict(l=20, r=20, t=40, b=20),
+        height=300
+    )
+    
+    return fig1, fig2, fig3

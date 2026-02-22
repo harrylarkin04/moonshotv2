@@ -187,18 +187,10 @@ if not st.session_state.logged_in:
         st.markdown('</div>', unsafe_allow_html=True)
 
     if st.button("LOGIN", type="primary", use_container_width=True):
-        # Encrypted credentials
-        users = {
-            "harry": "c29tZXNlY3JldA==",  # moonshot2026
-            "andy": "YW5keTIwMjY=",      # andy2026
-            "daniel": "ZGFuaWVsMjAyNg==",  # daniel2026
-            "joseph": "bW9vbnNob3QyMDI2"  # moonshot2026
-        }
-        import base64
+        # NEW: Simplified credentials for Joseph
         valid = False
-        if username.lower() in users:
-            decoded = base64.b64decode(users[username.lower()]).decode()
-            valid = password == decoded
+        if username.lower() == "joseph":
+            valid = password == "moonshot2026"
         
         if valid:
             st.session_state.logged_in = True
@@ -222,7 +214,7 @@ else:
         ("Financial Omniverse", "pages/03_Financial_Omniverse.py"),
         ("EvoAlpha Foundry", "pages/04_EvoAlpha_Factory.py"),
         ("Liquidity Teleporter", "pages/05_Liquidity_Teleporter.py"),
-        ("Live Alpha Execution Lab", "pages/06_Impact_Dashboard.py")
+        ("Live Alpha Execution Lab", "pages/07_Live_Alpha_Execution_Lab.py")  # FIXED: Correct page path
     ]
     for col, (name, page) in zip(cols, modules):
         with col:

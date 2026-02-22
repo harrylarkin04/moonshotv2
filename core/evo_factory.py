@@ -92,6 +92,18 @@ def evaluate(individual):
             min_scenario_sharpe = min(omniverse_results)
             robustness = max(0.4, min_scenario_sharpe / sharpe) if sharpe > 0 else 0.4
         
+        # NEW: Save alpha with real OOS metrics
+        alpha_name = f"Alpha_{hash(tuple(individual)) % 1000000}"
+        save_alpha(
+            name=alpha_name,
+            description=f"Evolved strategy with complexity {complexity:.2f}",
+            sharpe=sharpe,
+            persistence_score=persistence,
+            diversity=diversity,
+            consistency=consistency,
+            returns_series=metrics.get('returns_series', [])
+        )
+        
         return (sharpe * persistence_penalty * robustness, 
                 persistence, 
                 diversity, 
@@ -111,7 +123,14 @@ toolbox.register("select", tools.selNSGA2)
 
 def evolve_new_alpha(ui_context=True):
     try:
-        # For demo purposes, return success without actual evolution
+        # NEW: Actually run evolution instead of demo
+        population = toolbox.population(n=50)
+        algorithms.eaSimple(population, toolbox, cxpb=0.5, mutpb=0.2, ngen=10, verbose=False)
+        
+        # Save best individual
+        best_ind = tools.selBest(population, 1)[0]
+        evaluate(best_ind)
+        
         if ui_context:
             st.toast("🔥 ELITE alpha evolved and deployed!", icon="🚀")
         return True
