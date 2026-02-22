@@ -90,8 +90,8 @@ def evolve_new_alpha(ui_context=True):
         best_ind = tools.selBest(population, 1)[0]
         metrics = evaluate(best_ind)
         
-        # IMPROVEMENT: Stricter criteria for elite alphas
-        if metrics[0] > 3.8 and metrics[1] > 0.85:
+        # ENHANCED: Stricter criteria for elite alphas
+        if metrics[0] > 3.8 and metrics[1] > 0.85 and metrics[2] > 0.5:
             save_alpha(
                 name=f"EvolvedAlpha-{hash(tuple(best_ind)) % 1000000}",
                 description="Evolutionary strategy",
@@ -100,8 +100,12 @@ def evolve_new_alpha(ui_context=True):
                 diversity=metrics[2],
                 consistency=metrics[3]
             )
+            if ui_context:
+                st.toast("🔥 Elite alpha evolved and deployed!", icon="🚀")
             return True
         return False
     except Exception as e:
         logger.error(f"Evolution failed: {str(e)}")
+        if ui_context:
+            st.error(f"Evolution failed: {str(e)}")
         return False

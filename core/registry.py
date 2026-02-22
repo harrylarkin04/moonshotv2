@@ -91,9 +91,10 @@ def get_real_oos_metrics(strategy_fn):
     ann_vol = np.std(returns) * np.sqrt(252)
     sharpe = ann_ret / ann_vol if ann_vol > 0 else 0
     
-    # FIXED: Correct persistence calculation
-    positive_months = len([r for r in returns if r > 0])
-    persistence = positive_months / len(returns) if len(returns) > 0 else 0
+    # FIXED: Correct persistence calculation (monthly basis)
+    monthly_returns = pd.Series(returns).resample('M').prod()
+    positive_months = (monthly_returns > 0).sum()
+    persistence = positive_months / len(monthly_returns) if len(monthly_returns) > 0 else 0
     
     return {
         'sharpe': sharpe,
