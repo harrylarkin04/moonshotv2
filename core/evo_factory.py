@@ -1,4 +1,4 @@
-# ... (keep all existing imports except groq)
+# ... (keep all existing imports)
 from deap import base, creator, tools, algorithms
 import random
 import numpy as np
@@ -28,5 +28,4 @@ for cls in ['FitnessMax', 'Individual']:
 creator.create("FitnessMax", base.Fitness, weights=(1.0, 0.5, -0.2, 0.3, 0.4, 0.2, 0.3))
 creator.create("Individual", list, fitness=creator.FitnessMax)
 
-# ... (keep all existing code except Groq references)
-# Removed all Groq-related code
+# ... (keep all existing code)

@@ -6,9 +6,7 @@ import numpy as np
 import hashlib
 import json
 
-# 🔥 FIX FOR STREAMLIT CLOUD – create writable data folder
 os.makedirs('data', exist_ok=True)
-
 conn = sqlite3.connect('data/alphas.db', check_same_thread=False)
 
 conn.execute('''CREATE TABLE IF NOT EXISTS alphas (
@@ -21,11 +19,10 @@ conn.execute('''CREATE TABLE IF NOT EXISTS alphas (
     live_paper_trading INTEGER DEFAULT 0,
     oos_metrics TEXT DEFAULT '{}',
     diversity REAL DEFAULT 0.0,
-    consistency REAL DEFAULT 0.0  # NEW: Walk-forward consistency metric
+    consistency REAL DEFAULT 0.0
 )''')
 conn.commit()
 
-# Seed beautiful demo alphas on first run
 if pd.read_sql_query("SELECT COUNT(*) FROM alphas", conn).iloc[0,0] == 0:
     seed_alphas = [
         ("EvoAlpha_7842", "SMA(12,89)+RSI(14)+Hold(7) – CausalForge+Omniverse validated", 5.87, 4.81, 0.42, 0.85),
@@ -46,23 +43,13 @@ if pd.read_sql_query("SELECT COUNT(*) FROM alphas", conn).iloc[0,0] == 0:
     conn.commit()
 
 def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False, metrics=None, diversity=0.0):
-    """Save only elite alphas meeting strict criteria with full metrics"""
     try:
-        # Parse metrics for consistency score if available
-        consistency = 0.0
-        if metrics:
-            metrics_dict = json.loads(metrics) if isinstance(metrics, str) else metrics
-            consistency = metrics_dict.get('consistency', 0.0)
-        
-        # ENHANCED ELITE CRITERIA WITH DIVERSITY AND CONSISTENCY
         if sharpe > 3.5 and persistence_score > 0.8 and diversity > 0.3 and consistency > 0.7:
-            # Generate unique hash for deployment tracking
             strategy_hash = hashlib.sha256(f"{name}{description}{datetime.now()}".encode()).hexdigest()[:12]
             oos_metrics = {
                 'sharpe': sharpe,
                 'persistence': persistence_score,
                 'hash': strategy_hash,
-                'full_metrics': json.loads(metrics) if isinstance(metrics, str) else metrics,
                 'diversity': diversity,
                 'consistency': consistency
             }
@@ -81,7 +68,6 @@ def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False, 
         return False
 
 def get_top_alphas(n=20):
-    """Get top alphas with live trading performance and cyberpunk status"""
     try:
         df = pd.read_sql_query(f"""
             SELECT name, description, sharpe, persistence_score, live_paper_trading, created, oos_metrics, diversity, consistency 
@@ -91,16 +77,9 @@ def get_top_alphas(n=20):
             LIMIT {n}
         """, conn)
         
-        # Add cyberpunk deployment status and metrics
         if not df.empty:
             df['Status'] = df['live_paper_trading'].apply(
                 lambda x: "🟢 LIVE" if x else "🟣 QUEUED"
-            )
-            df['Performance'] = np.random.uniform(0.5, 2.5, size=len(df)) * df['sharpe']
-            
-            # Parse metrics
-            df['Metrics'] = df['oos_metrics'].apply(
-                lambda x: json.loads(x) if x else {}
             )
         return df
     except:
