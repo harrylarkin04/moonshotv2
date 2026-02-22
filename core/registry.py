@@ -5,7 +5,6 @@ from datetime import datetime
 import sqlite3
 from core.data_fetcher import get_train_test_data, get_multi_asset_data
 
-# Create database connection
 conn = sqlite3.connect('alphas.db')
 
 def save_alpha(name, description, sharpe, persistence_score, auto_deploy=False, metrics=None, diversity=0.0, consistency=0.0):
@@ -38,7 +37,7 @@ def get_real_oos_metrics(strategy_fn):
     """Real walk-forward validation with historical data and 5bp slippage"""
     full_data, _ = get_multi_asset_data(period="max")
     
-    # Use actual historical dates for walk-forward validation
+    # Historical walk-forward split
     train = full_data.loc[:'2022-01-01']
     test = full_data.loc['2022-01-02':'2024-06-01']
     
@@ -52,27 +51,32 @@ def get_real_oos_metrics(strategy_fn):
     
     returns = []
     current_position = 0
+    portfolio_value = 1.0
+    peak_value = 1.0
+    max_drawdown = 0.0
+    
     for i in range(1, len(test)):
         row = test.iloc[i]
         prev_row = test.iloc[i-1]
         
-        # Calculate actual asset returns from historical data
         asset_returns = (row / prev_row - 1).values
-        
-        # Get signal from strategy
-        signal = strategy_fn(prev_row)  # -1 to 1
-        target_position = signal * 1.0  # Full investment
+        signal = strategy_fn(prev_row)
+        target_position = signal * 1.0
         trade = target_position - current_position
         
-        # Apply 5bp slippage (0.0005 = 5 basis points)
+        # Apply 5bp slippage (0.0005)
         slippage = 0.0005 * abs(trade) if trade != 0 else 0
         executed_return = np.dot(asset_returns, target_position) - slippage
+        
+        # Update portfolio metrics
+        portfolio_value *= (1 + executed_return)
+        peak_value = max(peak_value, portfolio_value)
+        current_drawdown = (portfolio_value - peak_value) / peak_value
+        max_drawdown = min(max_drawdown, current_drawdown)
         
         returns.append(executed_return)
         current_position = target_position
     
-    # Calculate metrics
-    returns = np.array(returns)
     if len(returns) < 2:
         return {
             'sharpe': 0,
@@ -81,14 +85,9 @@ def get_real_oos_metrics(strategy_fn):
             'period': '2022-01-02_to_2024-06-01'
         }
     
+    returns = np.array(returns)
     sharpe = np.mean(returns) / np.std(returns) * np.sqrt(252)
-    persistence = (returns > 0).mean()  # Fraction of positive days
-    
-    # Calculate max drawdown
-    cumulative = np.cumprod(1 + returns)
-    peak = cumulative.max()
-    trough = cumulative.min()
-    max_drawdown = (trough - peak) / peak if peak != 0 else 0
+    persistence = (returns > 0).mean()
     
     return {
         'sharpe': sharpe,

@@ -43,9 +43,9 @@ def evaluate(individual):
     sharpe = metrics['sharpe']
     persistence = metrics['persistence']
     max_drawdown = metrics['max_drawdown']
-    diversity = 1 - max_drawdown  # Higher diversity with lower drawdown
-    consistency = (sharpe > 0) * persistence  # Consistency combines sharpe and persistence
-    novelty = 0.0  # Placeholder for novelty
+    diversity = 1 - max_drawdown
+    consistency = (sharpe > 0) * persistence
+    novelty = 0.0
     complexity = len(individual) / 50.0
     
     return (sharpe, persistence, diversity, consistency, novelty, complexity, max_drawdown)
@@ -76,7 +76,6 @@ def evolve_new_alpha(ui_context=True):
         best_ind = tools.selBest(population, 1)[0]
         metrics = evaluate(best_ind)
         
-        # Save if meets criteria
         if metrics[0] > 3.5 and metrics[1] > 0.8:
             save_alpha(
                 name=f"EvolvedAlpha-{hash(tuple(best_ind)) % 1000000}",
