@@ -43,6 +43,17 @@ st.markdown("""
     margin: 0 5px;
     font-weight: bold;
 }
+.progress-container {
+    background: rgba(0,0,0,0.3);
+    border-radius: 10px;
+    margin: 5px 0;
+    overflow: hidden;
+}
+.progress-bar {
+    height: 10px;
+    background: linear-gradient(90deg, #6a00ff, #00f3ff);
+    border-radius: 10px;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -64,6 +75,17 @@ with col1:
 with col2:
     st.markdown("**HOW IT WORKS:** Multi-agent system: Researcher agents → Coder agents → CausalForge → Omniverse → Evolutionary algorithms")
 
+# Add current hypothesis display
+if 'current_hypothesis' not in st.session_state:
+    st.session_state.current_hypothesis = "Market microstructure + dark pool flow anomalies"
+    
+st.markdown(f"""
+<div class="evolve-container" style="padding:1rem; margin-top:1rem">
+    <h3>ACTIVE HYPOTHESIS</h3>
+    <p style="font-size:1.1rem; color:#00f3ff">🔮 {st.session_state.current_hypothesis}</p>
+</div>
+""", unsafe_allow_html=True)
+
 if st.button("⚡ IGNITE EVOLUTIONARY FOUNDRY", type="primary", use_container_width=True, 
              help="Run full closed-loop evolution (takes 2-5 minutes)"):
     result_placeholder = st.empty()
@@ -79,33 +101,44 @@ if st.button("⚡ IGNITE EVOLUTIONARY FOUNDRY", type="primary", use_container_wi
 st.subheader("ELITE STRATEGY ZOO (Sharpe >3.5 | Persistence >0.8 | Drawdown <10%)")
 top_alphas = get_top_alphas(25)
 if not top_alphas.empty:
-    # Add cyberpunk styling
-    top_alphas['SHARPE'] = top_alphas['sharpe'].apply(lambda x: f"<span style='color:#00f3ff'>{x:.2f}</span>")
-    top_alphas['STATUS'] = top_alphas['Status']
-    st.markdown(top_alphas[['name', 'description', 'SHARPE', 'STATUS']].to_html(escape=False, index=False), 
-                unsafe_allow_html=True)
+    # Enhanced display with progress bars
+    for _, row in top_alphas.iterrows():
+        col1, col2 = st.columns([1, 3])
+        with col1:
+            st.markdown(f"**{row['name']}**")
+            st.caption(row['description'])
+        with col2:
+            # Sharpe progress
+            sharpe_pct = min(row['sharpe'] / 5.0, 1.0)
+            st.markdown(f"SHARPE: `{row['sharpe']:.2f}`")
+            st.markdown(f"""
+            <div class="progress-container">
+                <div class="progress-bar" style="width:{sharpe_pct*100}%"></div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Drawdown progress
+            dd_pct = min(abs(row['max_drawdown']) / 0.2, 1.0)
+            st.markdown(f"DRAWDOWN: `{row['max_drawdown']*100:.1f}%`")
+            st.markdown(f"""
+            <div class="progress-container">
+                <div class="progress-bar" style="width:{dd_pct*100}%; background:linear-gradient(90deg, #ff0066, #ff6600)"></div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Capacity progress
+            cap_pct = min(row['capacity'] / 2e9, 1.0)
+            st.markdown(f"CAPACITY: `${row['capacity']/1e6:.0f}M`")
+            st.markdown(f"""
+            <div class="progress-container">
+                <div class="progress-bar" style="width:{cap_pct*100}%; background:linear-gradient(90deg, #00cc66, #00ff99)"></div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        st.divider()
 else:
     st.warning("No elite strategies found")
 
-# Holographic performance visualization
+# Placeholder for holographic visualization will be filled during evolution
 st.subheader("EVOLUTIONARY PERFORMANCE")
-fig = go.Figure()
-x = np.linspace(0, 10, 100)
-for i in range(10):
-    y = np.sin(x + i/3) * (1 + i/10) + i
-    fig.add_trace(go.Scatter(
-        x=x, y=y, 
-        mode='lines',
-        line=dict(width=2, color=f'rgba({i*25}, {255-i*25}, 255, {0.2+i/15})'),
-        name=f'Strategy {i+1}'
-    ))
-fig.update_layout(
-    paper_bgcolor='rgba(0,0,0,0)',
-    plot_bgcolor='rgba(0,0,0,0)',
-    xaxis=dict(showgrid=False, title='Generation'),
-    yaxis=dict(showgrid=False, title='Fitness Score'),
-    margin=dict(l=20, r=20, t=30, b=20),
-    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-    height=400
-)
-st.plotly_chart(fig, use_container_width=True)
+viz_placeholder = st.empty()

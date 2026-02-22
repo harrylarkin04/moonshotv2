@@ -4,10 +4,31 @@ import networkx as nx
 from pyvis.network import Network
 import streamlit.components.v1 as components
 import numpy as np
+import hashlib
+import json
+from pathlib import Path
 
-# ==================== DEBUG GROQ ====================
-st.info(f"🔍 Debug: Secret key loaded = {'✅ YES' if st.secrets.get('GROQ_API_KEY') else '❌ NO'}")
-st.info(f"🔍 Debug: Env key loaded = {'✅ YES' if os.getenv('GROQ_API_KEY') else '❌ NO'}")
+# Cache directory setup
+CACHE_DIR = Path(".hypothesis_cache")
+CACHE_DIR.mkdir(exist_ok=True)
+
+def get_cache_key(assets):
+    """Generate unique cache key for asset set"""
+    return hashlib.md5(json.dumps(sorted(assets)).encode()).hexdigest()
+
+def get_cached_hypotheses(assets):
+    """Retrieve cached hypotheses if available"""
+    cache_file = CACHE_DIR / f"{get_cache_key(assets)}.json"
+    if cache_file.exists():
+        with open(cache_file, "r") as f:
+            return json.load(f)
+    return None
+
+def cache_hypotheses(assets, hypotheses):
+    """Cache generated hypotheses"""
+    cache_file = CACHE_DIR / f"{get_cache_key(assets)}.json"
+    with open(cache_file, "w") as f:
+        json.dump(hypotheses, f)
 
 # Lazy Groq client
 _groq_client = None
@@ -27,10 +48,23 @@ def get_groq_client():
     return _groq_client
 
 def swarm_generate_hypotheses(returns):
-    client = get_groq_client()
     assets = list(returns.columns)
+    
+    # Check cache first
+    cached = get_cached_hypotheses(assets)
+    if cached:
+        st.info("💾 Using cached hypotheses")
+        return cached
+    
+    client = get_groq_client()
 
-    prompt = f"""You are a swarm of 5 elite quant agents.
+    prompt = f"""You are a swarm of 5 elite quant agents with distinct specialties:
+1. Macro Strategist: Focuses on economic indicators, interest rates, and geopolitical events
+2. Volatility Trader: Specializes in options flows, gamma exposure, and volatility regimes
+3. Microstructure Expert: Analyzes order flow, dark pools, and market fragmentation
+4. Data Scientist: Identifies alternative data signals and ML patterns
+5. Crypto/Native: Focuses on blockchain flows, on-chain metrics, and crypto-specific dynamics
+
 Generate 5 distinct, novel multi-factor causal hypotheses for trading alphas using these assets: {assets}.
 Each hypothesis must suggest specific factors and how they causally drive returns.
 Output only one hypothesis per line, starting with "Agent X: "."""
@@ -44,18 +78,22 @@ Output only one hypothesis per line, starting with "Agent X: "."""
                 max_tokens=900
             )
             hypotheses = response.choices[0].message.content.strip().split("\n")
-            return [h.strip() for h in hypotheses if h.strip() and h.startswith("Agent")]
+            result = [h.strip() for h in hypotheses if h.strip() and h.startswith("Agent")]
+            cache_hypotheses(assets, result)
+            return result
         except Exception as e:
             st.warning(f"Groq API call failed: {e}")
 
     st.warning("Groq not available — using fallback hypotheses")
-    return [
+    result = [
         f"Agent 1: Satellite activity + low volatility regime in {np.random.choice(assets)} causally drives strong returns",
         f"Agent 2: Dark-pool flow anomalies + gamma skew predicts regime shift in {np.random.choice(assets)}",
         f"Agent 3: Web traffic surge + credit-card proxy leads persistent edge in {np.random.choice(assets)}",
         f"Agent 4: Order-flow signature + ETF creation/redemption anomalies in {np.random.choice(assets)}",
         f"Agent 5: Volatility skew cluster + shipping data causally drives {np.random.choice(assets)}"
     ]
+    cache_hypotheses(assets, result)
+    return result
 
 # Your other functions
 def build_causal_dag(returns):

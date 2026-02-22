@@ -159,11 +159,25 @@ def init_toolbox():
     """Initialize evolutionary operators with enhanced adaptive mutation"""
     toolbox.register("evaluate", evaluate)
     toolbox.register("select", tools.selTournament, tournsize=7)
-    toolbox.register("mate", tools.cxBlend, alpha=0.8)
+    
+    # Enhanced fitness-based crossover
+    def fitness_cx(ind1, ind2):
+        """Fitness-proportional blending crossover"""
+        f1 = max(ind1.fitness.values[0], 0.01)  # Avoid division by zero
+        f2 = max(ind2.fitness.values[0], 0.01)
+        alpha = f1 / (f1 + f2)
+        
+        for i in range(len(ind1)):
+            avg = alpha * ind1[i] + (1 - alpha) * ind2[i]
+            ind1[i] = int(avg + random.gauss(0, 0.1))
+            ind2[i] = int(avg + random.gauss(0, 0.1))
+        return ind1, ind2
+    
+    toolbox.register("mate", fitness_cx)
     
     # Enhanced fitness-aware mutation
     def adaptive_mutate(individual):
-        # Base mutation parameters
+        # Base parameters
         base_mutation_prob = 0.5
         base_sigma = 0.1
         
@@ -208,6 +222,8 @@ def evolve_new_alpha(ui_context=False):
             elite_count = st.empty()
             metrics_display = st.empty()
             live_stats = st.empty()
+            # Add placeholder for 3D visualization
+            viz_placeholder = st.empty()
         
         init_toolbox()
         pop = toolbox.population(n=1200)
@@ -219,6 +235,9 @@ def evolve_new_alpha(ui_context=False):
         stats.register("max", np.max)
         stats.register("min", np.min)
         stats.register("std", np.std)
+        
+        # Data collection for visualization
+        generation_data = []
         
         elite_counter = 0
         for gen in range(50):
@@ -232,6 +251,18 @@ def evolve_new_alpha(ui_context=False):
             
             # Record and display stats
             record = stats.compile(pop)
+            
+            # Collect data for visualization
+            gen_data = {
+                "generation": gen+1,
+                "avg_fitness": record['avg'],
+                "max_fitness": record['max'],
+                "min_fitness": record['min'],
+                "diversity": record['std'],
+                "top_individuals": [ind[:] for ind in tools.selBest(pop, 5)]
+            }
+            generation_data.append(gen_data)
+            
             if ui_context:
                 live_stats.markdown(f"""
                 **Population Stats**  
@@ -240,6 +271,52 @@ def evolve_new_alpha(ui_context=False):
                 Min Fitness: `{record['min']:.2f}`  
                 Diversity: `{record['std']:.4f}`
                 """)
+                
+                # Create 3D visualization
+                if gen > 0:  # Wait until we have at least 2 generations
+                    with viz_placeholder.container():
+                        st.subheader("HOLOGRAPHIC EVOLUTIONARY TRAJECTORY")
+                        fig = go.Figure()
+                        
+                        # Add fitness trajectory
+                        gens = [gd['generation'] for gd in generation_data]
+                        avg_fit = [gd['avg_fitness'] for gd in generation_data]
+                        max_fit = [gd['max_fitness'] for gd in generation_data]
+                        
+                        fig.add_trace(go.Scatter3d(
+                            x=gens, y=avg_fit, z=max_fit,
+                            mode='lines+markers',
+                            marker=dict(size=4, color='#00f3ff'),
+                            line=dict(width=6, color='#00b8ff'),
+                            name='Fitness Trajectory'
+                        ))
+                        
+                        # Add top individuals as points
+                        for i, gd in enumerate(generation_data):
+                            for j, ind in enumerate(gd['top_individuals']):
+                                fig.add_trace(go.Scatter3d(
+                                    x=[i+1], y=[gd['avg_fitness']], z=[gd['max_fitness']],
+                                    mode='markers',
+                                    marker=dict(
+                                        size=8,
+                                        color=[f'rgba({j*50}, {255-j*25}, 255, {0.7})'],
+                                        symbol='diamond'
+                                    ),
+                                    name=f'Top Strategy G{i+1}-{j+1}'
+                                ))
+                        
+                        fig.update_layout(
+                            scene=dict(
+                                xaxis_title='Generation',
+                                yaxis_title='Avg Fitness',
+                                zaxis_title='Max Fitness',
+                                bgcolor='rgba(0,0,0,0)'
+                            ),
+                            margin=dict(l=0, r=0, b=0, t=0),
+                            height=500,
+                            showlegend=False
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
             
             # Select next generation (elitism + offspring)
             elites = tools.selBest(pop, int(len(pop)*0.05))  # Top 5%
